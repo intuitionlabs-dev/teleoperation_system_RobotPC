@@ -1,0 +1,4 @@
+# Minimal requirements for teleoperation host
+pyzmq>=25.0.0
+piper-sdk>=1.0.0
+numpy>=1.24.0

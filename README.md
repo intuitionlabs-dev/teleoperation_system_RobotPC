@@ -8,6 +8,12 @@ Minimal ZMQ server for bimanual Piper robot control.
 - ZeroMQ (pyzmq)
 - CAN interfaces: `left_piper` and `right_piper`
 
+## Installation
+```bash
+conda activate lerobot
+pip install -r requirements.txt
+```
+
 ## Launch
 ```bash
 conda activate lerobot
@@ -18,11 +24,10 @@ conda activate lerobot
 - `--left_arm_port`: Left arm CAN port (default: left_piper)
 - `--right_arm_port`: Right arm CAN port (default: right_piper)
 - `--port_zmq_cmd`: Command receive port (default: 5555)
-- `--port_zmq_observations`: Observation send port (default: 5556)
 - `--max_loop_freq_hz`: Loop frequency (default: 60Hz)
 
 ## Architecture
-- Receive commands via ZMQ PULL
-- Send observations via ZMQ PUSH at 60Hz
-- Motors auto-enabled on first command
-- 35ms receive timeout for 30Hz operation
+- Receive commands via ZMQ PULL (unidirectional)
+- No observation sending
+- Motors enabled on startup
+- 35ms receive timeout for smooth operation

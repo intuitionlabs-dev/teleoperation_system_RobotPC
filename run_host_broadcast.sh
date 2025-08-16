@@ -10,6 +10,5 @@ python host_broadcast.py \
     --left_arm_port left_piper \
     --right_arm_port right_piper \
     --port_zmq_cmd 5555 \
-    --port_zmq_observations 5556 \
     --max_loop_freq_hz 60 \
     "$@"
