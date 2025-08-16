@@ -51,6 +51,11 @@ class BimanualPiperFollower:
         if not self.is_connected:
             raise RuntimeError("Robot is not connected")
         
+        # Debug: print first action to see format
+        if not hasattr(self, '_first_action_logged'):
+            print(f"[DEBUG] First bimanual action received: {action}")
+            self._first_action_logged = True
+        
         # Extract left and right actions
         left_action = {}
         right_action = {}
@@ -72,6 +77,11 @@ class BimanualPiperFollower:
             self.right_arm.send_action(right_action)
         
         return action
+    
+    def set_motors_engaged(self, engaged: bool) -> None:
+        """Enable or disable motors on both arms"""
+        self.left_arm.set_motors_engaged(engaged)
+        self.right_arm.set_motors_engaged(engaged)
     
     def disconnect(self) -> None:
         """Disconnect both arms"""

@@ -2,7 +2,6 @@
 # Simple launch script for Robot PC host broadcast
 
 echo "Starting minimal host broadcast..."
-echo "Make sure the conda environment 'lerobot' is activated"
 echo ""
 
 # Run with default settings (can override with command line args)

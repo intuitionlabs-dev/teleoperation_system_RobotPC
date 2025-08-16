@@ -49,6 +49,10 @@ class PiperSDKInterface:
         print(f"[SDK] Connected to {port}")
         
         if auto_enable_on_connect:
+            # Add delay for right arm to avoid conflicts
+            if "right" in port:
+                print("[SDK] Waiting 1s before enabling right arm motors...")
+                time.sleep(1.0)
             self.enable_motors()
     
     def enable_motors(self):
@@ -56,10 +60,14 @@ class PiperSDKInterface:
         max_retries = 5
         for i in range(max_retries):
             try:
-                if self.piper.EnablePiper():
+                result = self.piper.EnablePiper()
+                print(f"[DEBUG] EnablePiper on {self.device_path} returned: {result}")
+                if result:
                     self.piper.GripperCtrl(0, 1000, 0x01, 0)  # Enable gripper
-                    print("[SDK] Motors enabled")
+                    print(f"[SDK] Motors enabled on {self.device_path}")
                     return True
+                else:
+                    print(f"[SDK] EnablePiper failed on {self.device_path}, retry {i+1}/{max_retries}")
             except Exception as e:
                 if i < max_retries - 1:
                     time.sleep(0.1)
@@ -82,29 +90,39 @@ class PiperSDKInterface:
         """Set joint positions
         positions: list of 7 floats in range [-100, 100] for joints, [0, 100] for gripper
         """
-        # Scale from percentage to actual joint ranges
-        scaled_positions = []
+        # Convert from normalized (-100 to 100) to degrees
+        # The Piper SDK expects positions in units of 0.001 degrees
+        joint_positions_deg = []
+        
         for i in range(6):  # Joints
-            pos_pct = positions[i]
-            scaled = self.min_pos[i] + (self.max_pos[i] - self.min_pos[i]) * (pos_pct + 100) / 200
-            scaled_positions.append(scaled * 1000.0)  # Convert to 0.001 degrees
+            # Map -100 to 100 range to actual joint limits in degrees
+            normalized = positions[i]  # Already -100 to 100
+            # Map to joint range
+            center = (self.min_pos[i] + self.max_pos[i]) / 2.0
+            range_half = (self.max_pos[i] - self.min_pos[i]) / 2.0
+            actual_deg = center + (normalized / 100.0) * range_half
+            joint_positions_deg.append(actual_deg)
         
-        # Gripper: 0-100% range
-        gripper_mm = self.min_pos[6] + (self.max_pos[6] - self.min_pos[6]) * positions[6] / 100
-        scaled_positions.append(gripper_mm * 10000)  # Convert to 0.0001 mm
+        # Apply joint inversions and convert to 0.001 degrees
+        joint_0 = int(-joint_positions_deg[0] * 1000)  # Inverted
+        joint_1 = int(joint_positions_deg[1] * 1000)
+        joint_2 = int(joint_positions_deg[2] * 1000)
+        joint_3 = int(-joint_positions_deg[3] * 1000)  # Inverted
+        joint_4 = int(joint_positions_deg[4] * 1000)
+        joint_5 = int(-joint_positions_deg[5] * 1000)  # Inverted
         
-        # Apply joint inversions and send command
-        joint_0 = int(-scaled_positions[0])  # Inverted
-        joint_1 = int(scaled_positions[1])
-        joint_2 = int(scaled_positions[2])
-        joint_3 = int(-scaled_positions[3])  # Inverted
-        joint_4 = int(scaled_positions[4])
-        joint_5 = int(-scaled_positions[5])  # Inverted
-        gripper = int(scaled_positions[6])
+        # Gripper: map 0-100 to actual range in mm
+        gripper_pct = positions[6]
+        gripper_mm = self.min_pos[6] + (self.max_pos[6] - self.min_pos[6]) * gripper_pct / 100
+        gripper = int(gripper_mm * 10000)  # Convert to 0.0001 mm
+        
+        # Debug: print first position command
+        if not hasattr(self, '_first_pos_logged'):
+            print(f"[DEBUG] Sending positions to CAN: j0={joint_0}, j1={joint_1}, j2={joint_2}, j3={joint_3}, j4={joint_4}, j5={joint_5}, gripper={gripper}")
+            self._first_pos_logged = True
         
         self.piper.GripperCtrl(gripper, 1000, 0x01, 0)
-        self.piper.JointCtrlROI(2047, 2047, 2047, 2047, 2047, 2047,
-                                joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
+        self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
     
     def get_status(self) -> Dict[str, Any]:
         """Get current robot status"""

@@ -64,8 +64,14 @@ class Piper:
             action.get("joint_3.pos", 0),
             action.get("wrist_flex.pos", action.get("joint_4.pos", 0)),
             action.get("wrist_roll.pos", action.get("joint_5.pos", 0)),
-            action.get("gripper.pos", action.get("joint_6.pos", 0)),
+            action.get("gripper.pos", action.get("joint_6.pos", 50)),  # Default to 50% open
         ]
+        
+        # Debug: print first action to see format
+        if not hasattr(self, '_first_action_logged'):
+            print(f"[DEBUG] First action received: {action}")
+            print(f"[DEBUG] Positions to send: {positions}")
+            self._first_action_logged = True
         
         self.sdk.set_joint_positions(positions)
         return action
