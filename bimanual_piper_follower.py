@@ -53,7 +53,7 @@ class BimanualPiperFollower:
         
         # Debug: print first action to see format
         if not hasattr(self, '_first_action_logged'):
-            print(f"[DEBUG] First bimanual action received: {action}")
+            print(f"[DEBUG] First bimanual action received")
             self._first_action_logged = True
         
         # Extract left and right actions

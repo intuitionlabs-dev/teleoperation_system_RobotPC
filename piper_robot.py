@@ -67,11 +67,7 @@ class Piper:
             action.get("gripper.pos", action.get("joint_6.pos", 50)),  # Default to 50% open
         ]
         
-        # Debug: print first action to see format
-        if not hasattr(self, '_first_action_logged'):
-            print(f"[DEBUG] First action received: {action}")
-            print(f"[DEBUG] Positions to send: {positions}")
-            self._first_action_logged = True
+        # Debug logging removed - see piper_sdk_interface for command details
         
         self.sdk.set_joint_positions(positions)
         return action

@@ -102,7 +102,7 @@ def main(cfg: BroadcastHostConfig):
                 
                 # Debug: print first command to see format
                 if not hasattr(robot, '_first_cmd_logged'):
-                    print(f"[DEBUG] First command received: {cmd}")
+                    print(f"[DEBUG] First command received")
                     robot._first_cmd_logged = True
                 
                 robot.send_action(action)
