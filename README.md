@@ -1,22 +1,21 @@
-# Teleoperation Host (Robot PC)
+# Teleoperation Follower (Robot PC side)
 
-Minimal ZMQ server for bimanual Piper robot control.
+ZMQ server for bimanual Piper robot control.
 
-## Requirements
-- Python with `lerobot` conda environment
-- `piper_sdk` package
-- ZeroMQ (pyzmq)
-- CAN interfaces: `left_piper` and `right_piper`
 
 ## Installation
 ```bash
-conda activate lerobot
-pip install -r requirements.txt
+git clone https://github.com/intuitionlabs-dev/teleoperation_system_RobotPC.git
+cd teleoperation_system_RobotPC
+conda create -n teleoperate-RobotPC python=3.10
+conda activate teleoperate-RobotPC
+python -m pip install -r requirements.txt
 ```
 
 ## Launch
 ```bash
-conda activate lerobot
+cd teleoperation_system_RobotPC
+conda activate teleoperate-RobotPC
 ./run_host_broadcast.sh
 ```
 
@@ -25,9 +24,3 @@ conda activate lerobot
 - `--right_arm_port`: Right arm CAN port (default: right_piper)
 - `--port_zmq_cmd`: Command receive port (default: 5555)
 - `--max_loop_freq_hz`: Loop frequency (default: 60Hz)
-
-## Architecture
-- Receive commands via ZMQ PULL (unidirectional)
-- No observation sending
-- Motors enabled on startup
-- 35ms receive timeout for smooth operation
