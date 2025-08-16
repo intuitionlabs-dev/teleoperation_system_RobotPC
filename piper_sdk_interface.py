@@ -71,7 +71,7 @@ class PiperSDKInterface:
             self.min_pos[i] + (self.max_pos[i] - self.min_pos[i]) * (pos + 100) / 200
             for i, pos in enumerate(positions[:6])
         ]
-        scaled_positions = [100.0 * pos for pos in scaled_positions]  # Adjust factor
+        # Note: positions are already in degrees, no need for additional scaling
 
         # the gripper is from 0 to 100% range
         scaled_positions.append(self.min_pos[6] + (self.max_pos[6] - self.min_pos[6]) * positions[6] / 100)
@@ -91,7 +91,7 @@ class PiperSDKInterface:
             self._cmd_count = 0
         if self._cmd_count < 3:
             print(f"[DEBUG {self.port}] Cmd {self._cmd_count}: Input={[round(p,1) for p in positions]}")
-            print(f"[DEBUG {self.port}] Scaled before 100x={[round(p,1) for p in scaled_positions[:6]]}")
+            print(f"[DEBUG {self.port}] Scaled degrees={[round(p,1) for p in scaled_positions[:6]]}")
             print(f"[DEBUG {self.port}] Final: J0={joint_0}, J1={joint_1}, J2={joint_2}, J3={joint_3}, J4={joint_4}, J5={joint_5}")
             self._cmd_count += 1
         
