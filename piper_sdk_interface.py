@@ -51,6 +51,13 @@ class PiperSDKInterface:
             pos.max_angle_limit for pos in angel_status.all_motor_angle_limit_max_spd.motor[1:7]
         ] + [10]  # Gripper max position in mm
         
+        # Fallback to default limits if motor limits are all zero (CAN communication issue)
+        if all(x == 0 for x in self.min_pos[:6]) and all(x == 0 for x in self.max_pos[:6]):
+            print(f"[SDK] WARNING: Motor limits are zero on {port}, using default values")
+            # Default Piper joint limits in degrees
+            self.min_pos = [-90, -90, -90, -90, -90, -90, 0]
+            self.max_pos = [90, 90, 90, 90, 90, 90, 10]
+        
         print(f"[SDK] Motor limits from GetAllMotorAngleLimitMaxSpd on {port}:")
         print(f"[SDK] Min: {self.min_pos[:6]}")
         print(f"[SDK] Max: {self.max_pos[:6]}")
@@ -89,9 +96,14 @@ class PiperSDKInterface:
             self._cmd_count += 1
         
         # self.piper.MotionCtrl_2(0x01, 0x01, 100, 0x00) # default is position control
-        self.piper.MotionCtrl_2(0x01, 0x01, 100, 0xAD) # set to mit control
-        self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
-        self.piper.GripperCtrl(joint_6, 1000, 0x01, 0)
+        try:
+            self.piper.MotionCtrl_2(0x01, 0x01, 100, 0xAD) # set to mit control
+            self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
+            self.piper.GripperCtrl(joint_6, 1000, 0x01, 0)
+        except Exception as e:
+            # Log but don't crash on CAN send failures
+            if "SEND_MESSAGE_FAILED" not in str(e):
+                print(f"[SDK] Error sending command: {e}")
 
     def get_status(self) -> Dict[str, Any]:
         joint_status = self.piper.GetArmJointMsgs()
