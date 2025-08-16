@@ -1,7 +1,7 @@
 #!/bin/bash
 # Simple launch script for Robot PC host broadcast
 
-echo "Starting minimal host broadcast..."
+echo "Starting host broadcast..."
 echo ""
 
 # Run with default settings (can override with command line args)
