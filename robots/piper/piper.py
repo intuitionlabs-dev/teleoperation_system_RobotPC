@@ -69,6 +69,12 @@ class Piper(Robot):
         if not self._is_connected:
             raise RuntimeError(f"{self} is not connected.")
         
+        # Debug: Log received action
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"Piper received action keys: {list(action.keys())}")
+        logger.debug(f"Piper received action values: {action}")
+        
         # Map the action from the leader to joints for the follower
         # Handle both key styles (shoulder_pan.pos and joint_0.pos)
         positions = [
@@ -80,6 +86,8 @@ class Piper(Robot):
             action.get("wrist_roll.pos", action.get("joint_5.pos", 0)),
             action.get("gripper.pos", action.get("joint_6.pos", 0)),
         ]
+        
+        logger.debug(f"Sending positions to SDK: {positions}")
         
         self.sdk.set_joint_positions(positions)
         return action

@@ -39,6 +39,9 @@ def main(cfg: BroadcastHostConfig):
     - Additionally publishes each action on cfg.port_cmd_broadcast (PUB)
     - Publishes each observation on cfg.port_obs_broadcast (PUB)
     """
+    # Enable debug logging
+    logging.basicConfig(level=logging.DEBUG)
+    
     # Configure robot
     robot_config = BimanualPiperFollowerConfig(
         left_arm=PiperConfig(port=cfg.left_arm_port),
@@ -84,6 +87,7 @@ def main(cfg: BroadcastHostConfig):
                 if not first_cmd:
                     logging.info("First teleop action received - starting loop.")
                     first_cmd = True
+                logging.debug(f"Host received action: {data}")
                 robot.send_action(data)
                 
                 # Broadcast command
