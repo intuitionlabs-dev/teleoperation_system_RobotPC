@@ -6,7 +6,7 @@ Controls two Piper follower arms via network commands.
 
 ```bash
 # Create environment
-conda create -n robot_teleop python=3.10
+conda create -n robot_teleop python=3.10 -y
 conda activate robot_teleop
 
 # Install dependencies

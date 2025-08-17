@@ -1,5 +1,9 @@
 # Core dependencies for RobotPC teleoperation
-draccus
-zmq
-pyzmq
-piper_sdk
+# Versions based on lerobot_piper/pyproject.toml
+
+# Core packages
+draccus>=0.9.3
+pyzmq>=26.2.1
+
+# Piper robot control
+piper-sdk>=0.3.2
