@@ -68,7 +68,7 @@ def main(cfg: BroadcastHostConfig):
     )
     
     robot = BimanualPiperFollower(config=robot_config)
-    robot.connect()
+    robot.connect(calibrate=True)
     robot.set_motors_engaged(True)
     
     # Main loop
