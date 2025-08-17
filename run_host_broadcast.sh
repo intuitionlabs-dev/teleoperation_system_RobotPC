@@ -1,13 +1,10 @@
 #!/bin/bash
-# Simple launch script for Robot PC host broadcast
+# Script to run the host broadcast for bimanual Piper robot
 
-echo "Starting host broadcast..."
-echo ""
-
-# Run with default settings (can override with command line args)
-python host_broadcast.py \
+python -m host_broadcast \
     --left_arm_port left_piper \
     --right_arm_port right_piper \
     --port_zmq_cmd 5555 \
-    --max_loop_freq_hz 60 \
-    "$@"
+    --port_zmq_observations 5556 \
+    --port_cmd_broadcast 5557 \
+    --port_obs_broadcast 5558

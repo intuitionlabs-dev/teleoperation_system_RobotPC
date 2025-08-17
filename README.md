@@ -1,28 +1,36 @@
-# Teleoperation Follower (Robot PC side)
+# Robot PC - Bimanual Piper Control
 
-ZMQ server for bimanual Piper robot control.
+Controls two Piper follower arms via network commands.
 
-Uses PUB/SUB pattern for real-time teleoperation without message queuing delays.
+## Setup
 
-
-## Installation
 ```bash
-git clone https://github.com/intuitionlabs-dev/teleoperation_system_RobotPC.git
-cd teleoperation_system_RobotPC
-conda create -n teleoperate-RobotPC python=3.10
-conda activate teleoperate-RobotPC
-python -m pip install -r requirements.txt
+# Create environment
+conda create -n robot_teleop python=3.10
+conda activate robot_teleop
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-## Launch
+## Run
+
 ```bash
-cd teleoperation_system_RobotPC
-conda activate teleoperate-RobotPC
 ./run_host_broadcast.sh
 ```
 
-## Options
-- `--left_arm_port`: Left arm CAN port (default: left_piper)
-- `--right_arm_port`: Right arm CAN port (default: right_piper)
-- `--port_zmq_cmd`: Command receive port (default: 5555)
-- `--max_loop_freq_hz`: Loop frequency (default: 60Hz)
+Or manually:
+```bash
+python -m host_broadcast \
+    --left_arm_port left_piper \
+    --right_arm_port right_piper \
+    --port_zmq_cmd 5555 \
+    --port_zmq_observations 5556 \
+    --port_cmd_broadcast 5557 \
+    --port_obs_broadcast 5558
+```
+
+## Network
+- Listens on ports 5555-5558
+- Ensure firewall allows these ports
+- Note your IP address for Teleoperator PC configuration

@@ -1,5 +1,5 @@
-# Minimal requirements for teleoperation host
-pyzmq>=26.2.1
-piper-sdk>=0.3.2
-numpy>=1.24.0
-matplotlib>=3.5.0  # For plotting joint movements
+# Core dependencies for RobotPC teleoperation
+draccus
+zmq
+pyzmq
+piper_sdk

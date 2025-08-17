@@ -1,147 +1,122 @@
 #!/usr/bin/env python
-"""Minimal host broadcast for Robot PC - core teleoperation only"""
+"""
+Host broadcast module for bimanual Piper robot teleoperation.
+Receives commands from teleoperator and sends observations back.
+"""
+
 import json
+import logging
 import time
 from dataclasses import dataclass
+
+import draccus
 import zmq
-import numpy as np
-from pathlib import Path
-import sys
 
-# Add path for robot imports
-sys.path.append(str(Path(__file__).parent))
-
-# Import robot classes (we'll copy these next)
-from bimanual_piper_follower import BimanualPiperFollower
-from bimanual_piper_config import BimanualPiperFollowerConfig
-from piper_robot import Piper, PiperConfig
+from robots.bimanual_piper.bimanual_piper_follower import BimanualPiperFollower
+from robots.bimanual_piper.config import BimanualPiperFollowerConfig
+from robots.piper.config import PiperConfig
 
 
 @dataclass
 class BroadcastHostConfig:
-    # Robot arm ports
+    """Configuration for the broadcast host."""
     left_arm_port: str = "left_piper"
     right_arm_port: str = "right_piper"
-    
-    # ZMQ ports
     port_zmq_cmd: int = 5555
-    
-    # Loop frequency
+    port_zmq_observations: int = 5556
+    port_cmd_broadcast: int = 5557
+    port_obs_broadcast: int = 5558
     max_loop_freq_hz: int = 60
-    
-    # Enable listener for motor control
-    port_enable_listener: int = 5559
 
 
+@draccus.wrap()
 def main(cfg: BroadcastHostConfig):
-    """Minimal host broadcast main loop - command receiver only"""
-    print(f"Starting minimal host broadcast...")
-    print(f"Left arm: {cfg.left_arm_port}")
-    print(f"Right arm: {cfg.right_arm_port}")
-    print(f"Command port: {cfg.port_zmq_cmd}")
-    print(f"Max frequency: {cfg.max_loop_freq_hz} Hz")
+    """
+    Launch a bimanual Piper host and relay all commands & observations.
     
-    # Setup ZMQ context
-    context = zmq.Context()
-    
-    # Command receiver (SUB) - changed from PULL to avoid queuing
-    sub_cmd = context.socket(zmq.SUB)
-    sub_cmd.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all messages
-    sub_cmd.setsockopt(zmq.RCVTIMEO, 35)  # 35ms timeout for 30Hz operation
-    sub_cmd.bind(f"tcp://*:{cfg.port_zmq_cmd}")
-    
-    # Enable listener (SUB)
-    sub_enable = context.socket(zmq.SUB)
-    sub_enable.setsockopt(zmq.SUBSCRIBE, b"")
-    sub_enable.setsockopt(zmq.RCVTIMEO, 35)  # Non-blocking check
-    sub_enable.bind(f"tcp://*:{cfg.port_enable_listener}")
-    
-    # Initialize robot
+    - Receives actions from teleoperator (PULL socket on cfg.port_zmq_cmd)
+    - Sends observations back to teleoperator (PUSH on cfg.port_zmq_observations)
+    - Additionally publishes each action on cfg.port_cmd_broadcast (PUB)
+    - Publishes each observation on cfg.port_obs_broadcast (PUB)
+    """
+    # Configure robot
     robot_config = BimanualPiperFollowerConfig(
-        left_robot=PiperConfig(
-            robot_type="piper",
-            device_path=cfg.left_arm_port,
-        ),
-        right_robot=PiperConfig(
-            robot_type="piper", 
-            device_path=cfg.right_arm_port,
-        ),
+        left_arm=PiperConfig(port=cfg.left_arm_port),
+        right_arm=PiperConfig(port=cfg.right_arm_port),
     )
     
-    robot = BimanualPiperFollower(config=robot_config)
-    robot.connect(calibrate=True)
-    robot.set_motors_engaged(True)
+    logging.info("Configuring Bimanual Piper")
+    robot = BimanualPiperFollower(robot_config)
+    robot.connect()
     
-    # Main loop
-    loop_time = 1.0 / cfg.max_loop_freq_hz
-    last_time = time.time()
+    # Setup ZMQ sockets
+    context = zmq.Context()
     
-    print("\nStarting main loop...")
+    pull_cmd = context.socket(zmq.PULL)
+    pull_cmd.setsockopt(zmq.CONFLATE, 1)
+    pull_cmd.bind(f"tcp://*:{cfg.port_zmq_cmd}")
     
-    while True:
-        loop_start = time.time()
-        
-        # Check for enable/disable commands
-        try:
-            enable_msg = sub_enable.recv_string()
-            enable_data = json.loads(enable_msg)
-            if "enable" in enable_data:
-                robot.set_motors_engaged(enable_data["enable"])
-                print(f"Motors {'enabled' if enable_data['enable'] else 'disabled'}")
-        except zmq.Again:
-            pass  # No enable message
-        
-        # Try to receive command
-        cmd_received = False
-        try:
-            cmd_str = sub_cmd.recv_string()
-            cmd = json.loads(cmd_str)
+    push_obs = context.socket(zmq.PUSH)
+    push_obs.setsockopt(zmq.CONFLATE, 1)
+    push_obs.bind(f"tcp://*:{cfg.port_zmq_observations}")
+    
+    # Extra PUB sockets for broadcast
+    pub_cmd = context.socket(zmq.PUB)
+    pub_cmd.bind(f"tcp://*:{cfg.port_cmd_broadcast}")
+    
+    pub_obs = context.socket(zmq.PUB)
+    pub_obs.bind(f"tcp://*:{cfg.port_obs_broadcast}")
+    
+    first_cmd = False
+    max_loop_hz = cfg.max_loop_freq_hz
+    
+    logging.info("Bimanual Piper Host with broadcast ready - waiting for teleop...")
+    try:
+        while True:
+            loop_start = time.time()
+            try:
+                msg = pull_cmd.recv_string(flags=zmq.NOBLOCK)
+                try:
+                    data = json.loads(msg)
+                except json.JSONDecodeError:
+                    logging.warning("Received a malformed JSON message, skipping.")
+                    continue
+                if not first_cmd:
+                    logging.info("First teleop action received - starting loop.")
+                    first_cmd = True
+                robot.send_action(data)
+                
+                # Broadcast command
+                pub_cmd.send_string(msg)
+            except zmq.Again:
+                pass
             
-            # Apply command to robot
-            if "action" in cmd:
-                action = cmd["action"]
-                
-                # Debug: print first command to see format
-                if not hasattr(robot, '_first_cmd_logged'):
-                    print(f"[DEBUG] First command received")
-                    robot._first_cmd_logged = True
-                
-                robot.send_action(action)
-                cmd_received = True
-        except zmq.Again:
-            pass  # No command available
-        
-        # Rate limiting
-        elapsed = time.time() - loop_start
-        if elapsed < loop_time:
-            time.sleep(loop_time - elapsed)
-        
-        # Simple status every 2 seconds
-        if time.time() - last_time > 2.0:
-            rate = 1.0 / (time.time() - loop_start) if (time.time() - loop_start) > 0 else 0
-            status = "ACTIVE" if cmd_received else "IDLE"
-            print(f"[{status}] Rate: {rate:.1f} Hz")
-            last_time = time.time()
+            # Get observation each cycle
+            obs = robot.get_observation()
+            try:
+                push_obs.send_string(json.dumps(obs), flags=zmq.NOBLOCK)
+            except zmq.Again:
+                logging.debug("Teleop client not ready - dropping obs")
+            
+            # Broadcast observation
+            try:
+                pub_obs.send_string(json.dumps(obs), flags=zmq.NOBLOCK)
+            except zmq.Again:
+                pass
+            
+            # Loop timing
+            sleep_dt = max(1.0 / max_loop_hz - (time.time() - loop_start), 0)
+            time.sleep(sleep_dt)
+    except KeyboardInterrupt:
+        logging.info("Host interrupted - shutting down.")
+    finally:
+        robot.disconnect()
+        pull_cmd.close()
+        push_obs.close()
+        pub_cmd.close()
+        pub_obs.close()
+        context.term()
 
 
 if __name__ == "__main__":
-    # Simple argument parsing
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--left_arm_port", type=str, default="left_piper")
-    parser.add_argument("--right_arm_port", type=str, default="right_piper")
-    parser.add_argument("--port_zmq_cmd", type=int, default=5555)
-    parser.add_argument("--port_enable_listener", type=int, default=5559)
-    parser.add_argument("--max_loop_freq_hz", type=int, default=60)
-    
-    args = parser.parse_args()
-    
-    config = BroadcastHostConfig(
-        left_arm_port=args.left_arm_port,
-        right_arm_port=args.right_arm_port,
-        port_zmq_cmd=args.port_zmq_cmd,
-        port_enable_listener=args.port_enable_listener,
-        max_loop_freq_hz=args.max_loop_freq_hz
-    )
-    
-    main(config)
+    main()
