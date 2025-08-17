@@ -44,10 +44,11 @@ def main(cfg: BroadcastHostConfig):
     # Setup ZMQ context
     context = zmq.Context()
     
-    # Command receiver (PULL)
-    pull_cmd = context.socket(zmq.PULL)
-    pull_cmd.setsockopt(zmq.RCVTIMEO, 35)  # 35ms timeout for 30Hz operation
-    pull_cmd.bind(f"tcp://*:{cfg.port_zmq_cmd}")
+    # Command receiver (SUB) - changed from PULL to avoid queuing
+    sub_cmd = context.socket(zmq.SUB)
+    sub_cmd.setsockopt(zmq.SUBSCRIBE, b"")  # Subscribe to all messages
+    sub_cmd.setsockopt(zmq.RCVTIMEO, 35)  # 35ms timeout for 30Hz operation
+    sub_cmd.bind(f"tcp://*:{cfg.port_zmq_cmd}")
     
     # Enable listener (SUB)
     sub_enable = context.socket(zmq.SUB)
@@ -93,7 +94,7 @@ def main(cfg: BroadcastHostConfig):
         # Try to receive command
         cmd_received = False
         try:
-            cmd_str = pull_cmd.recv_string()
+            cmd_str = sub_cmd.recv_string()
             cmd = json.loads(cmd_str)
             
             # Apply command to robot

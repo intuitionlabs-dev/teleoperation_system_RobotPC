@@ -6,6 +6,7 @@ This directory contains scripts for logging and replaying robot joint commands.
 
 ### 1. log_commands.py
 Captures joint commands from the teleoperation system and saves them to a timestamped log file.
+Also generates plots showing joint movements over time.
 
 **Usage:**
 ```bash
@@ -17,6 +18,10 @@ The script will:
 - Create a log file in `logs/joint_commands_YYYYMMDD_HHMMSS.jsonl`
 - Pass through all output (you'll still see everything)
 - Extract and save all "Final: J0=..., J1=..." commands
+- Generate plots when stopped with Ctrl+C:
+  - One plot for each arm (left_piper and right_piper)
+  - Each plot shows all 7 joints (J0-J6) over time
+  - Plots saved in `logs/curve/joint_movements_ARMNAME_TIMESTAMP.png`
 - Show count of logged commands when stopped with Ctrl+C
 
 **Log Format:**
@@ -70,14 +75,25 @@ python testing_scripts/replay_commands.py logs/joint_commands_20240115_103000.js
    ./run_host_broadcast.sh 2>&1 | python testing_scripts/log_commands.py
    # Perform your teleoperation movements
    # Press Ctrl+C when done
+   # Plots will be automatically generated in logs/curve/
    ```
 
-2. **Check available logs:**
+2. **Check available logs and plots:**
    ```bash
-   ls -la logs/
+   # View log files
+   ls -la logs/joint_commands_*.jsonl
+   
+   # View generated plots
+   ls -la logs/curve/
    ```
 
-3. **Replay the recorded session:**
+3. **Generate plots from existing logs:**
+   ```bash
+   # If you need to regenerate plots or analyze old sessions
+   python testing_scripts/plot_from_log.py logs/joint_commands_20240115_103000.jsonl
+   ```
+
+4. **Replay the recorded session:**
    ```bash
    python testing_scripts/replay_commands.py logs/joint_commands_20240115_103000.jsonl
    ```
@@ -88,3 +104,21 @@ python testing_scripts/replay_commands.py logs/joint_commands_20240115_103000.js
 - Joint values are sent directly without any scaling (they're already in 0.001° units)
 - The replay timing matches the original recording (adjustable with --speed)
 - Both arms are controlled simultaneously, just like in teleoperation
+
+### 3. plot_from_log.py
+Generate plots from existing log files without running the teleoperation system.
+
+**Usage:**
+```bash
+# Plot from a specific log file
+python testing_scripts/plot_from_log.py logs/joint_commands_20240115_103000.jsonl
+
+# Save plots to a custom directory
+python testing_scripts/plot_from_log.py logs/joint_commands_20240115_103000.jsonl --output-dir /tmp/plots
+```
+
+**Features:**
+- Loads data from existing JSONL log files
+- Generates the same plots as log_commands.py
+- Shows statistics (duration, sample count, average rate)
+- Useful for post-analysis of recorded sessions

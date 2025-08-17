@@ -2,6 +2,8 @@
 
 ZMQ server for bimanual Piper robot control.
 
+Uses PUB/SUB pattern for real-time teleoperation without message queuing delays.
+
 
 ## Installation
 ```bash
