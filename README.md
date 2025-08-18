@@ -17,6 +17,8 @@ pip install -e .
 
 ## Run
 
+### Main Teleoperation
+
 ```bash
 ./run_host_broadcast.sh
 ```
@@ -32,7 +34,25 @@ python -m host_broadcast \
     --port_obs_broadcast 5558
 ```
 
+### Motor Enable Listener (Optional)
+
+Run in a separate terminal to enable/reset motors remotely:
+
+```bash
+python motor_enable_listener.py \
+    --left_arm_port left_piper \
+    --right_arm_port right_piper \
+    --default_enable_mode partial
+```
+
+Features:
+- Smart partial mode: Only enables disabled/problematic motors
+- Full reset mode: Resets all 7 motors per arm (6 joints + gripper)
+- Real-time status monitoring with detailed diagnostics
+- Detects and fixes "zombie" motors (enabled but problematic)
+
 ## Network
-- Listens on ports 5555-5558
+- Main teleoperation: ports 5555-5558
+- Motor enable listener: port 5559
 - Ensure firewall allows these ports
 - Note your IP address for Teleoperator PC configuration
