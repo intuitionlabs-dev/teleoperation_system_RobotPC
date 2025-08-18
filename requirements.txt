@@ -6,4 +6,4 @@ draccus>=0.9.3
 pyzmq>=26.2.1
 
 # Piper robot control
-piper-sdk>=0.3.2
+# piper-sdk>=0.3.2

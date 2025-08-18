@@ -15,13 +15,24 @@ except ImportError:
 class PiperSDKInterface:
     """Interface to communicate with Piper robot hardware."""
     
-    def __init__(self, port: str = "can0"):
+    def __init__(self, port: str = "can0", use_mit_mode: bool = True):
         if C_PiperInterface_V2 is None:
             raise ImportError("piper_sdk is not installed.")
-        self.piper = C_PiperInterface_V2(port)
+        # Enable SDK joint limits to enforce C_PiperParamManager limits
+        self.piper = C_PiperInterface_V2(port, start_sdk_joint_limit=True, start_sdk_gripper_limit=True)
         self.piper.ConnectPort()
         while not self.piper.EnablePiper():
             time.sleep(0.01)
+        
+        self.use_mit_mode = use_mit_mode
+        if self.use_mit_mode:
+            # Set MIT mode for fastest response: ctrl_mode=0x01 (CAN control), move_mode=0x01 (MOVE J), is_mit_mode=0xAD
+            self.piper.MotionCtrl_2(0x01, 0x01, 0, 0xAD)
+            print("MIT mode enabled for Piper arm")
+        else:
+            # Normal position control mode with 100% speed
+            self.piper.MotionCtrl_2(0x01, 0x01, 100, 0x00)
+        
         self.piper.GripperCtrl(0, 1000, 0x01, 0)
         
         # Get the min and max positions for each joint and gripper
@@ -59,7 +70,7 @@ class PiperSDKInterface:
         joint_5 = int(-scaled_positions[5])
         joint_6 = int(scaled_positions[6])
         
-        self.piper.MotionCtrl_2(0x01, 0x01, 100, 0x00)
+        # No need to call MotionCtrl_2 here since mode is already set in __init__
         self.piper.JointCtrl(joint_0, joint_1, joint_2, joint_3, joint_4, joint_5)
         self.piper.GripperCtrl(joint_6, 1000, 0x01, 0)
     

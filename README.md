@@ -11,6 +11,8 @@ conda activate robot_teleop
 
 # Install dependencies
 pip install -r requirements.txt
+cd piper_sdk
+pip install -e .
 ```
 
 ## Run
