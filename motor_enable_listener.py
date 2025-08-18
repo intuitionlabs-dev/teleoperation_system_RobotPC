@@ -450,6 +450,17 @@ class ArmController:
         
         if success_count == total_to_enable:
             print(f"🎉 {self.arm_name} arm: All problem motors enabled successfully! (ALL 7 motors)")
+            
+            # Restore MIT mode for teleoperation
+            print(f"   🎯 Restoring MIT mode for {self.arm_name} arm...")
+            try:
+                # Set MIT mode: ctrl_mode=0x01 (CAN control), move_mode=0x01 (MOVE J), speed=0, is_mit_mode=0xAD
+                self.piper.MotionCtrl_2(0x01, 0x01, 0, 0xAD)
+                print(f"   ✅ MIT mode restored for {self.arm_name} arm - ready for teleoperation!")
+            except Exception as e:
+                print(f"   ⚠️ Could not restore MIT mode: {e}")
+                print(f"   ℹ️ You may need to restart the teleoperation system")
+            
             return True
         else:
             print(f"⚠️  {self.arm_name} arm: {success_count}/{total_to_enable} problem motors enabled")
@@ -509,6 +520,17 @@ class ArmController:
         
         if enabled_count == 6 and gripper_enabled:
             print(f"🎉 {self.arm_name} arm: All 7 motors enabled successfully!")
+            
+            # Step 4: Restore MIT mode for teleoperation
+            print(f"   🎯 Restoring MIT mode for {self.arm_name} arm...")
+            try:
+                # Set MIT mode: ctrl_mode=0x01 (CAN control), move_mode=0x01 (MOVE J), speed=0, is_mit_mode=0xAD
+                self.piper.MotionCtrl_2(0x01, 0x01, 0, 0xAD)
+                print(f"   ✅ MIT mode restored for {self.arm_name} arm - ready for teleoperation!")
+            except Exception as e:
+                print(f"   ⚠️ Could not restore MIT mode: {e}")
+                print(f"   ℹ️ You may need to restart the teleoperation system")
+            
             return True
         else:
             total_enabled = enabled_count + (1 if gripper_enabled else 0)
