@@ -59,8 +59,11 @@ python -m host_broadcast \
 #### YAM System
 ```bash
 python -m host_broadcast \
-    --system yam-dynamixel
+    --system yam-dynamixel \
+    --yam_left_channel can_follow_l \
+    --yam_right_channel can_follow_r
 # Note: YAM system automatically uses ports 5565-5568 when --system yam-dynamixel is specified
+# Channel names default to can_follow_l and can_follow_r if not specified
 ```
 
 ### Motor Enable Listener

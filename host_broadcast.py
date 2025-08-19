@@ -29,9 +29,9 @@ class BroadcastHostConfig:
     left_arm_port: str = "left_piper"
     right_arm_port: str = "right_piper"
     
-    # YAM configuration
-    yam_left_config: str = "/home/group/i2rt/gello_software/configs/yam_auto_generated_left.yaml"
-    yam_right_config: str = "/home/group/i2rt/gello_software/configs/yam_auto_generated_right.yaml"
+    # YAM configuration - just CAN channels like Piper uses ports
+    yam_left_channel: str = "can_follow_l"
+    yam_right_channel: str = "can_follow_r"
     
     # Network configuration
     port_zmq_cmd: int = 5555
@@ -70,17 +70,21 @@ def main(cfg: BroadcastHostConfig):
         robot = BimanualPiperFollower(robot_config)
         
     elif cfg.system == "yam-dynamixel":
+        # Import directly to avoid triggering piper_sdk import check
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
         from robots.bimanual_yam.bimanual_yam_follower import BimanualYAMFollower
         from robots.bimanual_yam.config import BimanualYAMFollowerConfig, YAMConfig
         
         robot_config = BimanualYAMFollowerConfig(
             left_arm=YAMConfig(
-                config_path=cfg.yam_left_config,
+                channel=cfg.yam_left_channel,  # Just pass the CAN channel directly
                 hardware_port=6001,
                 id="left"
             ),
             right_arm=YAMConfig(
-                config_path=cfg.yam_right_config,
+                channel=cfg.yam_right_channel,  # Just pass the CAN channel directly
                 hardware_port=6002,
                 id="right"
             ),

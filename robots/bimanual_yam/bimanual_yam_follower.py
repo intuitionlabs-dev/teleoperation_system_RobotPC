@@ -31,31 +31,31 @@ class BimanualYAMFollower(Robot):
         self.config = config
         self._is_connected = False
         
-        # Add gello_software to path
-        gello_path = Path(config.gello_path)
-        if gello_path.exists() and str(gello_path) not in sys.path:
+        # Add gello_software to path - handle both absolute and relative paths
+        if Path(config.gello_path).is_absolute():
+            gello_path = Path(config.gello_path)
+        else:
+            # Relative to teleoperation_system_RobotPC directory
+            base_dir = Path(__file__).parent.parent.parent
+            gello_path = (base_dir / config.gello_path).resolve()
+        
+        if not gello_path.exists():
+            logger.error(f"Could not find gello_software at: {gello_path}")
+            raise RuntimeError(f"gello_software not found at {gello_path}")
+        
+        if str(gello_path) not in sys.path:
             sys.path.append(str(gello_path))
         
         # Import gello modules after adding to path
         try:
-            from gello.utils.launch_utils import instantiate_from_dict
             from gello.zmq_core.robot_node import ZMQClientRobot, ZMQServerRobot
         except ImportError as e:
             logger.error(f"Failed to import gello modules: {e}")
             logger.error("Make sure gello_software is properly installed")
             raise
         
-        self._instantiate_from_dict = instantiate_from_dict
         self._ZMQClientRobot = ZMQClientRobot
         self._ZMQServerRobot = ZMQServerRobot
-        
-        # Load configurations
-        self.left_cfg = OmegaConf.to_container(
-            OmegaConf.load(config.left_arm.config_path), resolve=True
-        )
-        self.right_cfg = OmegaConf.to_container(
-            OmegaConf.load(config.right_arm.config_path), resolve=True
-        )
         
         # Will be initialized on connect
         self.left_robot = None
@@ -112,16 +112,18 @@ class BimanualYAMFollower(Robot):
     
     def _setup_hardware_servers(self):
         """Setup ZMQ servers for hardware communication."""
-        # Left arm
-        logger.info(f"Setting up left YAM arm on port {self.config.left_arm.hardware_port}")
+        # Import YAMRobot directly
+        try:
+            from gello.robots.yam import YAMRobot
+        except ImportError as e:
+            logger.error(f"Failed to import YAMRobot: {e}")
+            raise
         
-        # Create left robot
-        left_robot_cfg = self.left_cfg["robot"]
-        if isinstance(left_robot_cfg.get("config"), str):
-            left_robot_cfg["config"] = OmegaConf.to_container(
-                OmegaConf.load(left_robot_cfg["config"]), resolve=True
-            )
-        self.left_robot = self._instantiate_from_dict(left_robot_cfg)
+        # Left arm
+        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}, port {self.config.left_arm.hardware_port}")
+        
+        # Create left robot directly with channel name
+        self.left_robot = YAMRobot(channel=self.config.left_arm.channel)
         
         # Create ZMQ server for left arm
         self.left_server = self._ZMQServerRobot(
@@ -143,15 +145,10 @@ class BimanualYAMFollower(Robot):
         logger.info("Waiting 3 seconds before initializing right arm (CAN bus delay)...")
         time.sleep(3)
         
-        logger.info(f"Setting up right YAM arm on port {self.config.right_arm.hardware_port}")
+        logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}, port {self.config.right_arm.hardware_port}")
         
-        # Create right robot
-        right_robot_cfg = self.right_cfg["robot"]
-        if isinstance(right_robot_cfg.get("config"), str):
-            right_robot_cfg["config"] = OmegaConf.to_container(
-                OmegaConf.load(right_robot_cfg["config"]), resolve=True
-            )
-        self.right_robot = self._instantiate_from_dict(right_robot_cfg)
+        # Create right robot directly with channel name
+        self.right_robot = YAMRobot(channel=self.config.right_arm.channel)
         
         # Create ZMQ server for right arm
         self.right_server = self._ZMQServerRobot(

@@ -8,7 +8,7 @@ from typing import Any, Dict
 try:
     from piper_sdk import C_PiperInterface_V2
 except ImportError:
-    print("Is the piper_sdk installed: pip install piper_sdk")
+    # Only print message when actually trying to use Piper, not on import
     C_PiperInterface_V2 = None
 
 
@@ -17,6 +17,7 @@ class PiperSDKInterface:
     
     def __init__(self, port: str = "can0", use_mit_mode: bool = True):
         if C_PiperInterface_V2 is None:
+            print("Is the piper_sdk installed: pip install piper_sdk")
             raise ImportError("piper_sdk is not installed.")
         # Enable SDK joint limits to enforce C_PiperParamManager limits
         self.piper = C_PiperInterface_V2(port, start_sdk_joint_limit=True, start_sdk_gripper_limit=True)
