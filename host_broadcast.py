@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Host broadcast module for bimanual Piper robot teleoperation.
+Host broadcast module for bimanual robot teleoperation (Piper or YAM).
 Receives commands from teleoperator and sends observations back.
 """
 
@@ -8,6 +8,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
+from typing import Literal
 
 import draccus
 import zmq
@@ -20,19 +21,36 @@ from robots.piper.config import PiperConfig
 @dataclass
 class BroadcastHostConfig:
     """Configuration for the broadcast host."""
+    # System selection
+    system: Literal["piper-so101", "yam-dynamixel"] = "piper-so101"
+    """Which robot system to use."""
+    
+    # Piper configuration
     left_arm_port: str = "left_piper"
     right_arm_port: str = "right_piper"
+    
+    # YAM configuration
+    yam_left_config: str = "/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/configs/yam_auto_generated_left.yaml"
+    yam_right_config: str = "/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/configs/yam_auto_generated_right.yaml"
+    
+    # Network configuration
     port_zmq_cmd: int = 5555
     port_zmq_observations: int = 5556
     port_cmd_broadcast: int = 5557
     port_obs_broadcast: int = 5558
     max_loop_freq_hz: int = 60
+    
+    # YAM system uses different ports to avoid conflicts
+    yam_port_zmq_cmd: int = 5565
+    yam_port_zmq_observations: int = 5566
+    yam_port_cmd_broadcast: int = 5567
+    yam_port_obs_broadcast: int = 5568
 
 
 @draccus.wrap()
 def main(cfg: BroadcastHostConfig):
     """
-    Launch a bimanual Piper host and relay all commands & observations.
+    Launch a bimanual robot host and relay all commands & observations.
     
     - Receives actions from teleoperator (PULL socket on cfg.port_zmq_cmd)
     - Sends observations back to teleoperator (PUSH on cfg.port_zmq_observations)
@@ -42,38 +60,75 @@ def main(cfg: BroadcastHostConfig):
     # Enable debug logging
     logging.basicConfig(level=logging.DEBUG)
     
-    # Configure robot
-    robot_config = BimanualPiperFollowerConfig(
-        left_arm=PiperConfig(port=cfg.left_arm_port),
-        right_arm=PiperConfig(port=cfg.right_arm_port),
-    )
+    # Configure robot based on system type
+    if cfg.system == "piper-so101":
+        robot_config = BimanualPiperFollowerConfig(
+            left_arm=PiperConfig(port=cfg.left_arm_port),
+            right_arm=PiperConfig(port=cfg.right_arm_port),
+        )
+        logging.info("Configuring Bimanual Piper")
+        robot = BimanualPiperFollower(robot_config)
+        
+    elif cfg.system == "yam-dynamixel":
+        from robots.bimanual_yam.bimanual_yam_follower import BimanualYAMFollower
+        from robots.bimanual_yam.config import BimanualYAMFollowerConfig, YAMConfig
+        
+        robot_config = BimanualYAMFollowerConfig(
+            left_arm=YAMConfig(
+                config_path=cfg.yam_left_config,
+                hardware_port=6001,
+                id="left"
+            ),
+            right_arm=YAMConfig(
+                config_path=cfg.yam_right_config,
+                hardware_port=6002,
+                id="right"
+            ),
+            id="bimanual",
+        )
+        logging.info("Configuring Bimanual YAM")
+        robot = BimanualYAMFollower(robot_config)
+        
+    else:
+        raise ValueError(f"Unknown system: {cfg.system}")
     
-    logging.info("Configuring Bimanual Piper")
-    robot = BimanualPiperFollower(robot_config)
+    logging.info(f"Starting {cfg.system} robot host")
     robot.connect()
+    
+    # Select ports based on system type
+    if cfg.system == "yam-dynamixel":
+        port_cmd = cfg.yam_port_zmq_cmd
+        port_obs = cfg.yam_port_zmq_observations
+        port_cmd_broadcast = cfg.yam_port_cmd_broadcast
+        port_obs_broadcast = cfg.yam_port_obs_broadcast
+    else:  # piper-so101
+        port_cmd = cfg.port_zmq_cmd
+        port_obs = cfg.port_zmq_observations
+        port_cmd_broadcast = cfg.port_cmd_broadcast
+        port_obs_broadcast = cfg.port_obs_broadcast
     
     # Setup ZMQ sockets
     context = zmq.Context()
     
     pull_cmd = context.socket(zmq.PULL)
     pull_cmd.setsockopt(zmq.CONFLATE, 1)
-    pull_cmd.bind(f"tcp://*:{cfg.port_zmq_cmd}")
+    pull_cmd.bind(f"tcp://*:{port_cmd}")
     
     push_obs = context.socket(zmq.PUSH)
     push_obs.setsockopt(zmq.CONFLATE, 1)
-    push_obs.bind(f"tcp://*:{cfg.port_zmq_observations}")
+    push_obs.bind(f"tcp://*:{port_obs}")
     
     # Extra PUB sockets for broadcast
     pub_cmd = context.socket(zmq.PUB)
-    pub_cmd.bind(f"tcp://*:{cfg.port_cmd_broadcast}")
+    pub_cmd.bind(f"tcp://*:{port_cmd_broadcast}")
     
     pub_obs = context.socket(zmq.PUB)
-    pub_obs.bind(f"tcp://*:{cfg.port_obs_broadcast}")
+    pub_obs.bind(f"tcp://*:{port_obs_broadcast}")
     
     first_cmd = False
     max_loop_hz = cfg.max_loop_freq_hz
     
-    logging.info("Bimanual Piper Host with broadcast ready - waiting for teleop...")
+    logging.info(f"{cfg.system} Host ready on ports {port_cmd}-{port_obs_broadcast} - waiting for teleop...")
     try:
         while True:
             loop_start = time.time()

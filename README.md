@@ -1,9 +1,15 @@
-# Robot PC - Bimanual Piper Control
+# Robot PC - Multi-System Robot Control
 
-Controls two Piper follower arms via network commands.
+Controls follower arms (Piper or YAM) via network commands.
+
+## Supported Systems
+
+- **piper-so101**: Dual Piper follower arms
+- **yam-dynamixel**: Dual YAM follower arms
 
 ## Setup
 
+### For Piper System
 ```bash
 # Create environment
 conda create -n robot_teleop python=3.10 -y
@@ -15,17 +21,33 @@ cd piper_sdk
 pip install -e .
 ```
 
-## Run
-
-### Main Teleoperation
-
+### For YAM System
 ```bash
-./run_host_broadcast.sh
+# Use the existing gello virtual environment
+source /home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/.venv/bin/activate
+
+# Install additional dependencies if needed
+pip install -r requirements.txt
 ```
 
-Or manually:
+## Run
+
+### Quick Start
+
+```bash
+# For Piper system (default)
+./run_host_broadcast.sh
+
+# For YAM system
+./run_host_broadcast.sh --system yam-dynamixel
+```
+
+### Manual Commands
+
+#### Piper System
 ```bash
 python -m host_broadcast \
+    --system piper-so101 \
     --left_arm_port left_piper \
     --right_arm_port right_piper \
     --port_zmq_cmd 5555 \
@@ -34,9 +56,17 @@ python -m host_broadcast \
     --port_obs_broadcast 5558
 ```
 
-### Motor Enable Listener (Optional)
+#### YAM System
+```bash
+python -m host_broadcast \
+    --system yam-dynamixel
+# Note: YAM system automatically uses ports 5565-5568 when --system yam-dynamixel is specified
+```
 
-Run in a separate terminal to enable/reset motors remotely:
+### Motor Enable Listener
+
+#### Piper System
+Run in a separate terminal to enable/reset Piper motors remotely:
 
 ```bash
 python motor_enable_listener.py \
@@ -51,8 +81,36 @@ Features:
 - Real-time status monitoring with detailed diagnostics
 - Detects and fixes "zombie" motors (enabled but problematic)
 
-## Network
-- Main teleoperation: ports 5555-5558
-- Motor enable listener: port 5559
+#### YAM System
+Run in a separate terminal to monitor and enable YAM motors:
+
+```bash
+python yam_motor_enable_listener.py \
+    --left-can can0 \
+    --right-can can1 \
+    --port 5569 \
+    --mode partial
+```
+
+Features:
+- Monitors DM motor error codes via CAN bus
+- Partial mode: Only cleans errors on disabled motors
+- Full mode: Resets all motor errors
+- Real-time status monitoring
+- Automatic error detection and reporting
+
+## Network Ports
+
+### Piper-SO101 System (Default)
+- Teleoperation: 5555-5558
+- Motor enable: 5559
+
+### YAM-Dynamixel System
+- Teleoperation: 5565-5568 (separated to avoid conflicts)
+- Motor enable: 5569
+- Hardware servers: 6001-6002
+
+### Common
+- Default IP (via Tailscale): 100.117.16.87
 - Ensure firewall allows these ports
 - Note your IP address for Teleoperator PC configuration
