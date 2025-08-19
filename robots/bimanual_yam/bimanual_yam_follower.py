@@ -46,26 +46,9 @@ class BimanualYAMFollower(Robot):
         if str(gello_path) not in sys.path:
             sys.path.append(str(gello_path))
         
-        # Import gello modules after adding to path
-        try:
-            from gello.zmq_core.robot_node import ZMQClientRobot, ZMQServerRobot
-        except ImportError as e:
-            logger.error(f"Failed to import gello modules: {e}")
-            logger.error("Make sure gello_software is properly installed")
-            raise
-        
-        self._ZMQClientRobot = ZMQClientRobot
-        self._ZMQServerRobot = ZMQServerRobot
-        
         # Will be initialized on connect
         self.left_robot = None
         self.right_robot = None
-        self.left_server = None
-        self.right_server = None
-        self.left_client = None
-        self.right_client = None
-        self.left_thread = None
-        self.right_thread = None
     
     @property
     def _motors_ft(self) -> dict[str, type]:
@@ -104,14 +87,14 @@ class BimanualYAMFollower(Robot):
         
         logger.info(f"Connecting {self.name}...")
         
-        # Setup hardware servers for each arm
-        self._setup_hardware_servers()
+        # Setup hardware for each arm
+        self._setup_hardware()
         
         self._is_connected = True
         logger.info(f"{self.name} connected.")
     
-    def _setup_hardware_servers(self):
-        """Setup ZMQ servers for hardware communication."""
+    def _setup_hardware(self):
+        """Setup YAM robot hardware."""
         # Import YAMRobot directly
         try:
             from gello.robots.yam import YAMRobot
@@ -120,51 +103,17 @@ class BimanualYAMFollower(Robot):
             raise
         
         # Left arm
-        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}, port {self.config.left_arm.hardware_port}")
-        
-        # Create left robot directly with channel name
+        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
         self.left_robot = YAMRobot(channel=self.config.left_arm.channel)
         
-        # Create ZMQ server for left arm
-        self.left_server = self._ZMQServerRobot(
-            self.left_robot,
-            port=self.config.left_arm.hardware_port,
-            host="127.0.0.1"
-        )
-        self.left_thread = threading.Thread(target=self.left_server.serve, daemon=False)
-        self.left_thread.start()
-        
-        # Wait and create client
-        time.sleep(0.5)
-        self.left_client = self._ZMQClientRobot(
-            port=self.config.left_arm.hardware_port,
-            host="127.0.0.1"
-        )
-        
-        # Right arm
+        # Right arm - wait to avoid CAN conflicts
         logger.info("Waiting 3 seconds before initializing right arm (CAN bus delay)...")
         time.sleep(3)
         
-        logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}, port {self.config.right_arm.hardware_port}")
-        
-        # Create right robot directly with channel name
+        logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}")
         self.right_robot = YAMRobot(channel=self.config.right_arm.channel)
         
-        # Create ZMQ server for right arm
-        self.right_server = self._ZMQServerRobot(
-            self.right_robot,
-            port=self.config.right_arm.hardware_port,
-            host="127.0.0.1"
-        )
-        self.right_thread = threading.Thread(target=self.right_server.serve, daemon=False)
-        self.right_thread.start()
-        
-        # Wait and create client
-        time.sleep(0.5)
-        self.right_client = self._ZMQClientRobot(
-            port=self.config.right_arm.hardware_port,
-            host="127.0.0.1"
-        )
+        logger.info("Both YAM arms initialized successfully")
     
     @property
     def is_calibrated(self) -> bool:
@@ -186,13 +135,13 @@ class BimanualYAMFollower(Robot):
         
         obs = {}
         
-        # Get left arm observation
-        left_obs = self.left_client.get_observation()
+        # Get left arm observation directly from robot
+        left_obs = self.left_robot.get_observation()
         for key, val in left_obs.items():
             obs[f"left_{key}"] = val
         
-        # Get right arm observation
-        right_obs = self.right_client.get_observation()
+        # Get right arm observation directly from robot
+        right_obs = self.right_robot.get_observation()
         for key, val in right_obs.items():
             obs[f"right_{key}"] = val
         
@@ -217,14 +166,14 @@ class BimanualYAMFollower(Robot):
             else:
                 logger.warning(f"Action key without arm prefix: {key}")
         
-        # Send to arms
+        # Send directly to robot arms
         if left_action:
-            self.left_client.send_action(left_action)
+            self.left_robot.send_action(left_action)
         else:
             logger.warning("No left arm actions in command")
         
         if right_action:
-            self.right_client.send_action(right_action)
+            self.right_robot.send_action(right_action)
         else:
             logger.warning("No right arm actions in command")
         
@@ -237,23 +186,8 @@ class BimanualYAMFollower(Robot):
         
         logger.info(f"Disconnecting {self.name}...")
         
-        # Close clients
-        if self.left_client:
-            self.left_client.close()
-        if self.right_client:
-            self.right_client.close()
-        
-        # Close servers
-        if self.left_server:
-            self.left_server.close()
-        if self.right_server:
-            self.right_server.close()
-        
-        # Wait for threads
-        if self.left_thread:
-            self.left_thread.join(timeout=2)
-        if self.right_thread:
-            self.right_thread.join(timeout=2)
+        # YAMRobot handles its own cleanup
+        # No explicit disconnect needed
         
         self._is_connected = False
         logger.info(f"{self.name} disconnected.")
