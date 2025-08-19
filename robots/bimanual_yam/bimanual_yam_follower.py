@@ -104,14 +104,24 @@ class BimanualYAMFollower(Robot):
         
         # Left arm
         logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
-        self.left_robot = YAMRobot(channel=self.config.left_arm.channel)
+        try:
+            self.left_robot = YAMRobot(channel=self.config.left_arm.channel)
+            logger.info("Left YAM arm initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize left YAM arm: {e}")
+            raise
         
         # Right arm - wait to avoid CAN conflicts
-        logger.info("Waiting 3 seconds before initializing right arm (CAN bus delay)...")
-        time.sleep(3)
+        logger.info("Waiting 5 seconds before initializing right arm (CAN bus delay)...")
+        time.sleep(5)
         
         logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}")
-        self.right_robot = YAMRobot(channel=self.config.right_arm.channel)
+        try:
+            self.right_robot = YAMRobot(channel=self.config.right_arm.channel)
+            logger.info("Right YAM arm initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize right YAM arm: {e}")
+            raise
         
         logger.info("Both YAM arms initialized successfully")
     
