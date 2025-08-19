@@ -30,8 +30,8 @@ class BroadcastHostConfig:
     right_arm_port: str = "right_piper"
     
     # YAM configuration
-    yam_left_config: str = "/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/configs/yam_auto_generated_left.yaml"
-    yam_right_config: str = "/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/configs/yam_auto_generated_right.yaml"
+    yam_left_config: str = "/home/group/i2rt/gello_software/configs/yam_auto_generated_left.yaml"
+    yam_right_config: str = "/home/group/i2rt/gello_software/configs/yam_auto_generated_right.yaml"
     
     # Network configuration
     port_zmq_cmd: int = 5555

@@ -23,7 +23,7 @@ class BimanualYAMFollowerConfig(RobotConfig):
     right_arm: YAMConfig = None
     
     # Virtual environment path for gello_software
-    venv_path: str = "/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/.venv"
+    venv_path: str = "/home/group/i2rt/gello_software/.venv"
     
     # Gello software path
-    gello_path: str = "/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software"
+    gello_path: str = "/home/group/i2rt/gello_software"

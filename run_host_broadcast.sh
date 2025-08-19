@@ -29,7 +29,7 @@ echo "System: $SYSTEM"
 
 # Activate virtual environment if using YAM system
 if [ "$SYSTEM" = "yam-dynamixel" ]; then
-    VENV_PATH="/home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/.venv"
+    VENV_PATH="/home/group/i2rt/gello_software/.venv"
     if [ -f "$VENV_PATH/bin/activate" ]; then
         echo "Activating virtual environment for YAM system..."
         source "$VENV_PATH/bin/activate"

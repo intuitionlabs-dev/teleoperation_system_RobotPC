@@ -24,7 +24,7 @@ pip install -e .
 ### For YAM System
 ```bash
 # Use the existing gello virtual environment
-source /home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/.venv/bin/activate
+source /home/group/i2rt/gello_software/.venv/bin/activate
 
 # Install additional dependencies if needed
 uv pip install -r requirements.txt

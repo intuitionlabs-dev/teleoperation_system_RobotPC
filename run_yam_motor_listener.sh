@@ -2,7 +2,7 @@
 # Launch script for YAM motor enable listener
 
 # Activate virtual environment
-source /home/francesco/meta-tele-RTX/clean_version/i2rt/gello_software/.venv/bin/activate
+source /home/group/i2rt/gello_software/.venv/bin/activate
 
 # Default configuration
 LEFT_CAN="can0"
