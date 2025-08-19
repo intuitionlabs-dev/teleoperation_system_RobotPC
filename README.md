@@ -88,9 +88,13 @@ Features:
 Run in a separate terminal to monitor and enable YAM motors:
 
 ```bash
+# Quick start with defaults
+./run_yam_motor_listener.sh
+
+# Or manually specify options
 python yam_motor_enable_listener.py \
-    --left-can can0 \
-    --right-can can1 \
+    --left-can can_follow_l \
+    --right-can can_follow_r \
     --port 5569 \
     --mode partial
 ```
@@ -101,6 +105,7 @@ Features:
 - Full mode: Resets all motor errors
 - Real-time status monitoring
 - Automatic error detection and reporting
+- Default CAN channels: can_follow_l (left), can_follow_r (right)
 
 ## Network Ports
 
@@ -114,6 +119,8 @@ Features:
 - Hardware servers: 6001-6002
 
 ### Common
-- Default IP (via Tailscale): 100.117.16.87
+- Default IPs (via Tailscale):
+  - Piper PC: 100.117.16.87
+  - YAM PC: 100.119.166.86
 - Ensure firewall allows these ports
 - Note your IP address for Teleoperator PC configuration

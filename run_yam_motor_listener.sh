@@ -5,8 +5,8 @@
 source /home/group/i2rt/gello_software/.venv/bin/activate
 
 # Default configuration
-LEFT_CAN="can0"
-RIGHT_CAN="can1"
+LEFT_CAN="can_follow_l"
+RIGHT_CAN="can_follow_r"
 PORT=5569
 MODE="partial"
 
@@ -31,8 +31,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help)
             echo "Usage: $0 [--left-can CAN] [--right-can CAN] [--port PORT] [--mode MODE]"
-            echo "  --left-can: Left arm CAN channel (default: can0)"
-            echo "  --right-can: Right arm CAN channel (default: can1)"
+            echo "  --left-can: Left arm CAN channel (default: can_follow_l)"
+            echo "  --right-can: Right arm CAN channel (default: can_follow_r)"
             echo "  --port: Listen port (default: 5569)"
             echo "  --mode: Default enable mode - partial or full (default: partial)"
             exit 0
