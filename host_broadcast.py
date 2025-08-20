@@ -76,24 +76,49 @@ def main(cfg: BroadcastHostConfig):
         import sys
         import os
         sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-        from robots.bimanual_yam.bimanual_yam_follower import BimanualYAMFollower
-        from robots.bimanual_yam.config import BimanualYAMFollowerConfig, YAMConfig
         
-        robot_config = BimanualYAMFollowerConfig(
-            left_arm=YAMConfig(
-                channel=cfg.yam_left_channel,  # Just pass the CAN channel directly
-                hardware_port=6001,
-                id="left"
-            ),
-            right_arm=YAMConfig(
-                channel=cfg.yam_right_channel,  # Just pass the CAN channel directly
-                hardware_port=6002,
-                id="right"
-            ),
-            id="bimanual",
-        )
-        logging.info("Configuring Bimanual YAM")
-        robot = BimanualYAMFollower(robot_config)
+        if cfg.yam_use_zmq:
+            # Use ZMQ connection to existing hardware servers
+            from robots.bimanual_yam.bimanual_yam_follower_zmq import BimanualYAMFollowerZMQ
+            from robots.bimanual_yam.config import BimanualYAMFollowerConfig, YAMConfig
+            
+            robot_config = BimanualYAMFollowerConfig(
+                left_arm=YAMConfig(
+                    channel=cfg.yam_left_channel,
+                    hardware_port=6001,
+                    id="left"
+                ),
+                right_arm=YAMConfig(
+                    channel=cfg.yam_right_channel,
+                    hardware_port=6003,  # Different port for right arm
+                    id="right"
+                ),
+                gello_path=cfg.yam_gello_path,
+                id="bimanual",
+            )
+            logging.info("Configuring Bimanual YAM with ZMQ connection to hardware servers")
+            robot = BimanualYAMFollowerZMQ(robot_config)
+        else:
+            # Direct motor control (not recommended when hardware servers are running)
+            from robots.bimanual_yam.bimanual_yam_follower import BimanualYAMFollower
+            from robots.bimanual_yam.config import BimanualYAMFollowerConfig, YAMConfig
+            
+            robot_config = BimanualYAMFollowerConfig(
+                left_arm=YAMConfig(
+                    channel=cfg.yam_left_channel,
+                    hardware_port=6001,
+                    id="left"
+                ),
+                right_arm=YAMConfig(
+                    channel=cfg.yam_right_channel,
+                    hardware_port=6003,
+                    id="right"
+                ),
+                gello_path=cfg.yam_gello_path,
+                id="bimanual",
+            )
+            logging.info("Configuring Bimanual YAM with direct motor control")
+            robot = BimanualYAMFollower(robot_config)
         
     else:
         raise ValueError(f"Unknown system: {cfg.system}")
