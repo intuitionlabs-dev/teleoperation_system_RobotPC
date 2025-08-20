@@ -137,21 +137,66 @@ class BimanualYAMFollowerZMQ(Robot):
         if not self._is_connected:
             raise RuntimeError(f"{self.name} is not connected")
         
+        import numpy as np
+        
         obs = {}
         
         # Get left arm observation
         left_obs = self.left_client.get_observations()
-        for i in range(7):
-            obs[f"left_joint_{i}.pos"] = left_obs["pos"][i]
-            obs[f"left_joint_{i}.vel"] = left_obs["vel"][i]
-            obs[f"left_joint_{i}.eff"] = left_obs["eff"][i]
+        # The observation might be a numpy array or dict with 'qpos', 'qvel', 'qeff'
+        if isinstance(left_obs, dict):
+            if "qpos" in left_obs:
+                # Format: {'qpos': array, 'qvel': array, 'qeff': array}
+                for i in range(min(7, len(left_obs["qpos"]))):
+                    obs[f"left_joint_{i}.pos"] = float(left_obs["qpos"][i])
+                    obs[f"left_joint_{i}.vel"] = float(left_obs.get("qvel", np.zeros(7))[i])
+                    obs[f"left_joint_{i}.eff"] = float(left_obs.get("qeff", np.zeros(7))[i])
+            elif "pos" in left_obs:
+                # Format: {'pos': array, 'vel': array, 'eff': array}
+                for i in range(min(7, len(left_obs["pos"]))):
+                    obs[f"left_joint_{i}.pos"] = float(left_obs["pos"][i])
+                    obs[f"left_joint_{i}.vel"] = float(left_obs.get("vel", np.zeros(7))[i])
+                    obs[f"left_joint_{i}.eff"] = float(left_obs.get("eff", np.zeros(7))[i])
+            else:
+                # Try direct numpy array access
+                for i in range(7):
+                    obs[f"left_joint_{i}.pos"] = float(left_obs.get(i, 0.0))
+                    obs[f"left_joint_{i}.vel"] = 0.0
+                    obs[f"left_joint_{i}.eff"] = 0.0
+        else:
+            # Assume it's a numpy array of positions
+            for i in range(min(7, len(left_obs))):
+                obs[f"left_joint_{i}.pos"] = float(left_obs[i])
+                obs[f"left_joint_{i}.vel"] = 0.0
+                obs[f"left_joint_{i}.eff"] = 0.0
         
         # Get right arm observation  
         right_obs = self.right_client.get_observations()
-        for i in range(7):
-            obs[f"right_joint_{i}.pos"] = right_obs["pos"][i]
-            obs[f"right_joint_{i}.vel"] = right_obs["vel"][i]
-            obs[f"right_joint_{i}.eff"] = right_obs["eff"][i]
+        if isinstance(right_obs, dict):
+            if "qpos" in right_obs:
+                # Format: {'qpos': array, 'qvel': array, 'qeff': array}
+                for i in range(min(7, len(right_obs["qpos"]))):
+                    obs[f"right_joint_{i}.pos"] = float(right_obs["qpos"][i])
+                    obs[f"right_joint_{i}.vel"] = float(right_obs.get("qvel", np.zeros(7))[i])
+                    obs[f"right_joint_{i}.eff"] = float(right_obs.get("qeff", np.zeros(7))[i])
+            elif "pos" in right_obs:
+                # Format: {'pos': array, 'vel': array, 'eff': array}
+                for i in range(min(7, len(right_obs["pos"]))):
+                    obs[f"right_joint_{i}.pos"] = float(right_obs["pos"][i])
+                    obs[f"right_joint_{i}.vel"] = float(right_obs.get("vel", np.zeros(7))[i])
+                    obs[f"right_joint_{i}.eff"] = float(right_obs.get("eff", np.zeros(7))[i])
+            else:
+                # Try direct numpy array access
+                for i in range(7):
+                    obs[f"right_joint_{i}.pos"] = float(right_obs.get(i, 0.0))
+                    obs[f"right_joint_{i}.vel"] = 0.0
+                    obs[f"right_joint_{i}.eff"] = 0.0
+        else:
+            # Assume it's a numpy array of positions
+            for i in range(min(7, len(right_obs))):
+                obs[f"right_joint_{i}.pos"] = float(right_obs[i])
+                obs[f"right_joint_{i}.vel"] = 0.0
+                obs[f"right_joint_{i}.eff"] = 0.0
         
         return obs
     
@@ -169,9 +214,8 @@ class BimanualYAMFollowerZMQ(Robot):
             if key in action:
                 left_positions.append(action[key])
             else:
-                # Get current position if not specified
-                left_obs = self.left_client.get_observations()
-                left_positions.append(left_obs["pos"][i])
+                # Use zero position if not specified
+                left_positions.append(0.0)
         
         # Extract positions for right arm
         right_positions = []
@@ -180,22 +224,22 @@ class BimanualYAMFollowerZMQ(Robot):
             if key in action:
                 right_positions.append(action[key])
             else:
-                # Get current position if not specified
-                right_obs = self.right_client.get_observations()
-                right_positions.append(right_obs["pos"][i])
+                # Use zero position if not specified
+                right_positions.append(0.0)
         
         # Send commands to arms via ZMQ
         try:
-            # Send to left arm
-            left_action = {"pos": np.array(left_positions)}
-            self.left_client.command_joint_state(left_action)
+            # The ZMQ client expects numpy arrays directly
+            # Send position commands to left arm
+            self.left_client.command_joint_pos(np.array(left_positions))
             
-            # Send to right arm
-            right_action = {"pos": np.array(right_positions)}
-            self.right_client.command_joint_state(right_action)
+            # Send position commands to right arm
+            self.right_client.command_joint_pos(np.array(right_positions))
             
         except Exception as e:
             logger.error(f"Error sending commands via ZMQ: {e}")
+            logger.error(f"Left positions: {left_positions}")
+            logger.error(f"Right positions: {right_positions}")
         
         return action
     
