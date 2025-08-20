@@ -243,6 +243,10 @@ class BimanualYAMFollower(Robot):
             kp = np.array([50, 50, 80, 10, 5, 5, 10])  # From get_yam_robot
             kd = np.array([5, 5, 5, 1.5, 1.5, 1.5, 1.0])
             
+            # Log the positions we're sending
+            logger.debug(f"Sending left positions: {left_positions[:3]}...")  # Just first 3 for brevity
+            logger.debug(f"Sending right positions: {right_positions[:3]}...")
+            
             # Send commands to left arm
             self.left_motor_chain.set_commands(
                 torques=left_torques,
