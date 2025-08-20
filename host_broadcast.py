@@ -33,7 +33,7 @@ class BroadcastHostConfig:
     yam_left_channel: str = "can_follow_l"
     yam_right_channel: str = "can_follow_r"
     yam_use_zmq: bool = True  # Use ZMQ connection to hardware servers
-    yam_gello_path: str = "../i2rt/gello_software"
+    yam_gello_path: str = "../gello_software"  # Relative to teleoperation_system_RobotPC
     
     # Network configuration
     port_zmq_cmd: int = 5555
