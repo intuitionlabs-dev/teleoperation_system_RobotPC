@@ -96,9 +96,9 @@ class BimanualYAMFollower(Robot):
     def _setup_hardware(self):
         """Setup YAM robot hardware using direct motor control interfaces."""
         # Import necessary modules for direct motor control
+        import numpy as np
         try:
             from i2rt.motor_drivers.dm_driver import DMChainCanInterface, ReceiveMode
-            import numpy as np
         except ImportError as e:
             logger.error(f"Failed to import i2rt modules: {e}")
             logger.error("Make sure i2rt is in PYTHONPATH")
@@ -128,7 +128,7 @@ class BimanualYAMFollower(Robot):
                 self.config.left_arm.channel,
                 motor_chain_name="yam_left",
                 receive_mode=ReceiveMode.p16,
-                start_thread=True,  # Start control thread
+                start_thread=False,  # We'll start it manually after setting initial commands
             )
             
             # Store initial positions
@@ -153,7 +153,7 @@ class BimanualYAMFollower(Robot):
                 self.config.right_arm.channel,
                 motor_chain_name="yam_right",
                 receive_mode=ReceiveMode.p16,
-                start_thread=True,  # Start control thread
+                start_thread=False,  # We'll start it manually after setting initial commands
             )
             
             # Store initial positions
@@ -163,6 +163,40 @@ class BimanualYAMFollower(Robot):
         except Exception as e:
             logger.error(f"Failed to initialize right YAM arm: {e}")
             raise
+        
+        # Initialize with proper kp/kd values and start threads
+        logger.info("Setting initial motor commands with proper gains...")
+        
+        # Set initial commands with proper kp/kd to enable motors
+        kp = np.array([50, 50, 80, 10, 5, 5, 5])  # Last one is gripper kp
+        kd = np.array([5, 5, 5, 1.5, 1.5, 1.5, 1.4])  # Last one is gripper kd
+        
+        # Send initial position commands to enable motors
+        left_torques = np.zeros(7)
+        right_torques = np.zeros(7)
+        
+        # Set initial commands for left arm
+        self.left_motor_chain.set_commands(
+            torques=left_torques,
+            pos=np.array(self.left_positions),
+            kp=kp,
+            kd=kd,
+            get_state=False
+        )
+        
+        # Set initial commands for right arm  
+        self.right_motor_chain.set_commands(
+            torques=right_torques,
+            pos=np.array(self.right_positions),
+            kp=kp,
+            kd=kd,
+            get_state=False
+        )
+        
+        # Now start the control threads
+        logger.info("Starting control threads...")
+        self.left_motor_chain.start_thread()
+        self.right_motor_chain.start_thread()
         
         logger.info("Both YAM arms initialized successfully")
     
@@ -240,8 +274,8 @@ class BimanualYAMFollower(Robot):
             right_torques = np.zeros(7)
             
             # Set KP and KD gains for position control
-            kp = np.array([50, 50, 80, 10, 5, 5, 10])  # From get_yam_robot
-            kd = np.array([5, 5, 5, 1.5, 1.5, 1.5, 1.0])
+            kp = np.array([50, 50, 80, 10, 5, 5, 5])  # Last one is gripper kp
+            kd = np.array([5, 5, 5, 1.5, 1.5, 1.5, 1.4])  # Last one is gripper kd
             
             # Log the positions we're sending
             logger.debug(f"Sending left positions: {left_positions[:3]}...")  # Just first 3 for brevity
