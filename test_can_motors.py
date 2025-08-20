@@ -53,18 +53,35 @@ def test_can_channel(channel: str):
         
         for motor_id, motor_type in motor_types.items():
             try:
-                # Try to enable motor using motor_on method
+                # Try to enable motor - but catch timeout issues
                 logger.info(f"  Testing motor {motor_id} ({motor_type})...")
                 
-                # Try to turn on motor and get response
-                motor_info = motor_interface.motor_on(motor_id, motor_type)
-                
-                if motor_info:
-                    responsive_motors.append(motor_id)
-                    logger.info(f"    ✓ Motor {motor_id} responded")
-                else:
+                # First, just try to send a message and see if we get any response
+                # without using motor_on which might block
+                try:
+                    # Flush any pending messages
+                    while motor_interface.try_receive_message(timeout=0.001):
+                        pass
+                    
+                    # Send enable command directly
+                    data = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFC]
+                    message = motor_interface.bus.send(
+                        motor_interface._get_message(motor_id, data)
+                    )
+                    
+                    # Try to receive response with short timeout
+                    response = motor_interface.try_receive_message(timeout=0.1)
+                    
+                    if response and response.arbitration_id == motor_id:
+                        responsive_motors.append(motor_id)
+                        logger.info(f"    ✓ Motor {motor_id} responded")
+                    else:
+                        unresponsive_motors.append(motor_id)
+                        logger.warning(f"    ✗ Motor {motor_id} did not respond (timeout)")
+                        
+                except Exception as e:
                     unresponsive_motors.append(motor_id)
-                    logger.warning(f"    ✗ Motor {motor_id} did not respond")
+                    logger.warning(f"    ✗ Motor {motor_id} error during test: {e}")
                     
                 time.sleep(0.05)
                 
