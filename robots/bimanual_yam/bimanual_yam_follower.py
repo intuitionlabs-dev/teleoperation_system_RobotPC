@@ -207,6 +207,8 @@ class BimanualYAMFollower(Robot):
         if not self._is_connected:
             raise RuntimeError(f"{self.name} is not connected")
         
+        import numpy as np
+        
         # Extract positions for left arm
         left_positions = []
         for i in range(7):
@@ -227,18 +229,40 @@ class BimanualYAMFollower(Robot):
                 # Use current position if not specified
                 right_positions.append(self.right_positions[i])
         
-        # Send commands to motors using the correct method
+        # Send commands to motors using the set_commands method
         try:
-            # Create motor commands for position control
-            from i2rt.motor_drivers.dm_driver import MotorCmd
+            # Convert to numpy arrays
+            left_pos_array = np.array(left_positions)
+            right_pos_array = np.array(right_positions)
             
-            left_cmds = [MotorCmd(type='pos', pos=pos, kp=10.0, kd=1.0) for pos in left_positions]
-            self.left_motor_chain.send_motor_commands(left_cmds)
+            # Create torque arrays (zero torque for position control)
+            left_torques = np.zeros(7)
+            right_torques = np.zeros(7)
+            
+            # Set KP and KD gains for position control
+            kp = np.array([50, 50, 80, 10, 5, 5, 10])  # From get_yam_robot
+            kd = np.array([5, 5, 5, 1.5, 1.5, 1.5, 1.0])
+            
+            # Send commands to left arm
+            self.left_motor_chain.set_commands(
+                torques=left_torques,
+                pos=left_pos_array,
+                kp=kp,
+                kd=kd,
+                get_state=False
+            )
             self.left_positions = left_positions
             
-            right_cmds = [MotorCmd(type='pos', pos=pos, kp=10.0, kd=1.0) for pos in right_positions]
-            self.right_motor_chain.send_motor_commands(right_cmds)
+            # Send commands to right arm
+            self.right_motor_chain.set_commands(
+                torques=right_torques,
+                pos=right_pos_array,
+                kp=kp,
+                kd=kd,
+                get_state=False
+            )
             self.right_positions = right_positions
+            
         except Exception as e:
             logger.error(f"Error sending motor commands: {e}")
         
