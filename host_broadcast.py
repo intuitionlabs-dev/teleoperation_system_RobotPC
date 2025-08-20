@@ -32,6 +32,8 @@ class BroadcastHostConfig:
     # YAM configuration - just CAN channels like Piper uses ports
     yam_left_channel: str = "can_follow_l"
     yam_right_channel: str = "can_follow_r"
+    yam_use_zmq: bool = True  # Use ZMQ connection to hardware servers
+    yam_gello_path: str = "../i2rt/gello_software"
     
     # Network configuration
     port_zmq_cmd: int = 5555
