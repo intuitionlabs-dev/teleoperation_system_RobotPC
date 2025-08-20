@@ -33,6 +33,8 @@ if [ "$SYSTEM" = "yam-dynamixel" ]; then
     if [ -f "$VENV_PATH/bin/activate" ]; then
         echo "Activating virtual environment for YAM system..."
         source "$VENV_PATH/bin/activate"
+        # Add i2rt to PYTHONPATH for YAM system
+        export PYTHONPATH="/home/group/i2rt:$PYTHONPATH"
     fi
 fi
 
