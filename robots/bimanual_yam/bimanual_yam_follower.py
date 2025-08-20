@@ -105,7 +105,8 @@ class BimanualYAMFollower(Robot):
             raise
         
         # Motor configuration for YAM (7 motors per arm including gripper)
-        motor_list = [
+        # Each arm uses the same motor IDs but on different CAN channels
+        left_motor_list = [
             [0x01, "DM4340"],
             [0x02, "DM4340"], 
             [0x03, "DM4340"],
@@ -114,15 +115,26 @@ class BimanualYAMFollower(Robot):
             [0x06, "DM4310"],
             [0x07, "DM4310"],  # Gripper
         ]
+        
+        right_motor_list = [
+            [0x01, "DM4340"],
+            [0x02, "DM4340"], 
+            [0x03, "DM4340"],
+            [0x04, "DM4310"],
+            [0x05, "DM4310"],
+            [0x06, "DM4310"],
+            [0x07, "DM4310"],  # Gripper
+        ]
+        
         motor_offsets = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         motor_directions = [1, 1, 1, 1, 1, 1, 1]
         
         # Setup left arm
         logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
         try:
-            # Create motor chain for left arm
+            # Create motor chain for left arm - it will turn on motors internally
             self.left_motor_chain = DMChainCanInterface(
-                motor_list,
+                left_motor_list,
                 motor_offsets,
                 motor_directions,
                 self.config.left_arm.channel,
@@ -131,23 +143,26 @@ class BimanualYAMFollower(Robot):
                 start_thread=False,  # We'll start it manually after setting initial commands
             )
             
+            # Wait for motors to stabilize
+            time.sleep(1)
+            
             # Store initial positions
             motor_states = self.left_motor_chain.read_states()
             self.left_positions = [m.pos for m in motor_states]
-            logger.info("Left YAM arm initialized successfully")
+            logger.info(f"Left YAM arm initialized, positions: {[f'{p:.2f}' for p in self.left_positions[:3]]}...")
         except Exception as e:
             logger.error(f"Failed to initialize left YAM arm: {e}")
             raise
         
-        # Setup right arm
-        logger.info("Waiting 3 seconds before initializing right arm (CAN bus delay)...")
-        time.sleep(3)
+        # Setup right arm with longer delay
+        logger.info("Waiting 5 seconds before initializing right arm (CAN bus stability)...")
+        time.sleep(5)
         
         logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}")
         try:
-            # Create motor chain for right arm
+            # Create motor chain for right arm - it will turn on motors internally
             self.right_motor_chain = DMChainCanInterface(
-                motor_list,
+                right_motor_list,
                 motor_offsets,
                 motor_directions,
                 self.config.right_arm.channel,
@@ -156,10 +171,13 @@ class BimanualYAMFollower(Robot):
                 start_thread=False,  # We'll start it manually after setting initial commands
             )
             
+            # Wait for motors to stabilize
+            time.sleep(1)
+            
             # Store initial positions
             motor_states = self.right_motor_chain.read_states()
             self.right_positions = [m.pos for m in motor_states]
-            logger.info("Right YAM arm initialized successfully")
+            logger.info(f"Right YAM arm initialized, positions: {[f'{p:.2f}' for p in self.right_positions[:3]]}...")
         except Exception as e:
             logger.error(f"Failed to initialize right YAM arm: {e}")
             raise
@@ -193,9 +211,14 @@ class BimanualYAMFollower(Robot):
             get_state=False
         )
         
-        # Now start the control threads
-        logger.info("Starting control threads...")
+        # Now start the control threads with delay between them
+        logger.info("Starting left arm control thread...")
         self.left_motor_chain.start_thread()
+        
+        logger.info("Waiting 2 seconds before starting right arm thread...")
+        time.sleep(2)
+        
+        logger.info("Starting right arm control thread...")
         self.right_motor_chain.start_thread()
         
         logger.info("Both YAM arms initialized successfully")
