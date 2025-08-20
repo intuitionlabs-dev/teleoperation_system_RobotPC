@@ -97,32 +97,43 @@ class BimanualYAMFollower(Robot):
         """Setup YAM robot hardware using direct motor control interfaces."""
         # Import necessary modules for direct motor control
         try:
-            from i2rt.motor_drivers.dm_driver import DMChainCanInterface
-            from i2rt.utils.mujoco_utils import MuJoCoKDL
+            from i2rt.motor_drivers.dm_driver import DMChainCanInterface, ReceiveMode
+            import numpy as np
         except ImportError as e:
             logger.error(f"Failed to import i2rt modules: {e}")
             logger.error("Make sure i2rt is in PYTHONPATH")
             raise
         
-        # Motor configuration for YAM (7 motors per arm)
-        motor_ids = [1, 2, 3, 4, 5, 6, 7]
-        motor_types = ["DM4340", "DM4340", "DM4340", "DM4310", "DM4310", "DM4310", "DM4310"]
+        # Motor configuration for YAM (7 motors per arm including gripper)
+        motor_list = [
+            [0x01, "DM4340"],
+            [0x02, "DM4340"], 
+            [0x03, "DM4340"],
+            [0x04, "DM4310"],
+            [0x05, "DM4310"],
+            [0x06, "DM4310"],
+            [0x07, "DM4310"],  # Gripper
+        ]
+        motor_offsets = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        motor_directions = [1, 1, 1, 1, 1, 1, 1]
         
         # Setup left arm
         logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
         try:
             # Create motor chain for left arm
             self.left_motor_chain = DMChainCanInterface(
-                channel=self.config.left_arm.channel,
-                motor_ids=motor_ids,
-                motor_types=motor_types,
-                gravity_compensation=True,
-                gripper_motor_id=7,
-                gripper_motor_type="DM4310"
+                motor_list,
+                motor_offsets,
+                motor_directions,
+                self.config.left_arm.channel,
+                motor_chain_name="yam_left",
+                receive_mode=ReceiveMode.p16,
+                start_thread=True,  # Start control thread
             )
             
             # Store initial positions
-            self.left_positions = [0.0] * 7
+            motor_states = self.left_motor_chain.read_states()
+            self.left_positions = [m.pos for m in motor_states]
             logger.info("Left YAM arm initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize left YAM arm: {e}")
@@ -136,16 +147,18 @@ class BimanualYAMFollower(Robot):
         try:
             # Create motor chain for right arm
             self.right_motor_chain = DMChainCanInterface(
-                channel=self.config.right_arm.channel,
-                motor_ids=motor_ids,
-                motor_types=motor_types,
-                gravity_compensation=True,
-                gripper_motor_id=7,
-                gripper_motor_type="DM4310"
+                motor_list,
+                motor_offsets,
+                motor_directions,
+                self.config.right_arm.channel,
+                motor_chain_name="yam_right",
+                receive_mode=ReceiveMode.p16,
+                start_thread=True,  # Start control thread
             )
             
             # Store initial positions
-            self.right_positions = [0.0] * 7
+            motor_states = self.right_motor_chain.read_states()
+            self.right_positions = [m.pos for m in motor_states]
             logger.info("Right YAM arm initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize right YAM arm: {e}")
@@ -214,14 +227,20 @@ class BimanualYAMFollower(Robot):
                 # Use current position if not specified
                 right_positions.append(self.right_positions[i])
         
-        # Send commands to motors
-        if left_positions:
-            self.left_motor_chain.send_position_commands(left_positions)
+        # Send commands to motors using the correct method
+        try:
+            # Create motor commands for position control
+            from i2rt.motor_drivers.dm_driver import MotorCmd
+            
+            left_cmds = [MotorCmd(type='pos', pos=pos, kp=10.0, kd=1.0) for pos in left_positions]
+            self.left_motor_chain.send_motor_commands(left_cmds)
             self.left_positions = left_positions
-        
-        if right_positions:
-            self.right_motor_chain.send_position_commands(right_positions)
+            
+            right_cmds = [MotorCmd(type='pos', pos=pos, kp=10.0, kd=1.0) for pos in right_positions]
+            self.right_motor_chain.send_motor_commands(right_cmds)
             self.right_positions = right_positions
+        except Exception as e:
+            logger.error(f"Error sending motor commands: {e}")
         
         return action
     
