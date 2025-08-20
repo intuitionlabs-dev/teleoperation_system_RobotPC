@@ -94,37 +94,83 @@ class BimanualYAMFollower(Robot):
         logger.info(f"{self.name} connected.")
     
     def _setup_hardware(self):
-        """Setup YAM robot hardware using direct motor control."""
+        """Setup YAM robot hardware in separate threads to avoid blocking."""
         # Import necessary modules
         try:
             from i2rt.robots.get_robot import get_yam_robot
+            from gello.zmq_core.robot_node import ZMQClientRobot, ZMQServerRobot
         except ImportError as e:
-            logger.error(f"Failed to import i2rt modules: {e}")
+            logger.error(f"Failed to import modules: {e}")
             logger.error("Make sure i2rt is in PYTHONPATH")
             raise
         
-        # Setup left arm directly
-        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
-        try:
-            # Create robot using i2rt's get_yam_robot function
-            self.left_robot = get_yam_robot(channel=self.config.left_arm.channel)
-            logger.info("Left YAM arm initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize left YAM arm: {e}")
-            raise
+        self._ZMQClientRobot = ZMQClientRobot
+        self._ZMQServerRobot = ZMQServerRobot
         
-        # Setup right arm
+        # Function to initialize robot in a thread
+        def init_robot_with_zmq(channel, port, name):
+            """Initialize robot and wrap it with ZMQ server."""
+            logger.info(f"Initializing {name} on channel {channel}")
+            robot = get_yam_robot(channel=channel)
+            
+            # Create ZMQ server for the robot
+            server = self._ZMQServerRobot(
+                robot,
+                port=port,
+                host="127.0.0.1"
+            )
+            
+            # Store references
+            if name == "left":
+                self.left_robot = robot
+                self.left_server = server
+            else:
+                self.right_robot = robot
+                self.right_server = server
+            
+            # Start serving (this will block)
+            server.serve()
+        
+        # Setup left arm in a thread
+        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
+        self.left_thread = threading.Thread(
+            target=init_robot_with_zmq,
+            args=(self.config.left_arm.channel, self.config.left_arm.hardware_port, "left"),
+            daemon=False
+        )
+        self.left_thread.start()
+        
+        # Wait a bit for the server to start
+        time.sleep(2)
+        
+        # Create client for left arm
+        self.left_client = self._ZMQClientRobot(
+            port=self.config.left_arm.hardware_port,
+            host="127.0.0.1"
+        )
+        logger.info("Left YAM arm initialized successfully")
+        
+        # Setup right arm in a thread
         logger.info("Waiting 3 seconds before initializing right arm (CAN bus delay)...")
         time.sleep(3)
         
         logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}")
-        try:
-            # Create robot using i2rt's get_yam_robot function
-            self.right_robot = get_yam_robot(channel=self.config.right_arm.channel)
-            logger.info("Right YAM arm initialized successfully")
-        except Exception as e:
-            logger.error(f"Failed to initialize right YAM arm: {e}")
-            raise
+        self.right_thread = threading.Thread(
+            target=init_robot_with_zmq,
+            args=(self.config.right_arm.channel, self.config.right_arm.hardware_port, "right"),
+            daemon=False
+        )
+        self.right_thread.start()
+        
+        # Wait a bit for the server to start
+        time.sleep(2)
+        
+        # Create client for right arm
+        self.right_client = self._ZMQClientRobot(
+            port=self.config.right_arm.hardware_port,
+            host="127.0.0.1"
+        )
+        logger.info("Right YAM arm initialized successfully")
         
         logger.info("Both YAM arms initialized successfully")
     
@@ -148,13 +194,13 @@ class BimanualYAMFollower(Robot):
         
         obs = {}
         
-        # Get left arm observation directly
-        left_obs = self.left_robot.get_observation()
+        # Get left arm observation through ZMQ client
+        left_obs = self.left_client.get_observation()
         for key, val in left_obs.items():
             obs[f"left_{key}"] = val
         
-        # Get right arm observation directly
-        right_obs = self.right_robot.get_observation()
+        # Get right arm observation through ZMQ client
+        right_obs = self.right_client.get_observation()
         for key, val in right_obs.items():
             obs[f"right_{key}"] = val
         
@@ -179,14 +225,14 @@ class BimanualYAMFollower(Robot):
             else:
                 logger.warning(f"Action key without arm prefix: {key}")
         
-        # Send directly to robots
+        # Send through ZMQ clients
         if left_action:
-            self.left_robot.send_action(left_action)
+            self.left_client.send_action(left_action)
         else:
             logger.warning("No left arm actions in command")
         
         if right_action:
-            self.right_robot.send_action(right_action)
+            self.right_client.send_action(right_action)
         else:
             logger.warning("No right arm actions in command")
         
@@ -199,8 +245,23 @@ class BimanualYAMFollower(Robot):
         
         logger.info(f"Disconnecting {self.name}...")
         
-        # The i2rt robots handle their own cleanup
-        # No explicit disconnect needed
+        # Close clients
+        if hasattr(self, 'left_client') and self.left_client:
+            self.left_client.close()
+        if hasattr(self, 'right_client') and self.right_client:
+            self.right_client.close()
+        
+        # Close servers
+        if hasattr(self, 'left_server') and self.left_server:
+            self.left_server.close()
+        if hasattr(self, 'right_server') and self.right_server:
+            self.right_server.close()
+        
+        # Wait for threads
+        if hasattr(self, 'left_thread') and self.left_thread:
+            self.left_thread.join(timeout=2)
+        if hasattr(self, 'right_thread') and self.right_thread:
+            self.right_thread.join(timeout=2)
         
         self._is_connected = False
         logger.info(f"{self.name} disconnected.")
