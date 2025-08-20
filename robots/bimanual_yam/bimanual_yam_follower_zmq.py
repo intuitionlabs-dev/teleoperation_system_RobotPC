@@ -229,12 +229,15 @@ class BimanualYAMFollowerZMQ(Robot):
         
         # Send commands to arms via ZMQ
         try:
-            # The ZMQ client expects numpy arrays directly
+            # The ZMQ client expects numpy arrays directly via command_joint_state
             # Send position commands to left arm
-            self.left_client.command_joint_pos(np.array(left_positions))
+            self.left_client.command_joint_state(np.array(left_positions))
             
             # Send position commands to right arm
-            self.right_client.command_joint_pos(np.array(right_positions))
+            self.right_client.command_joint_state(np.array(right_positions))
+            
+            logger.debug(f"Sent left positions: {left_positions[:3]}...")
+            logger.debug(f"Sent right positions: {right_positions[:3]}...")
             
         except Exception as e:
             logger.error(f"Error sending commands via ZMQ: {e}")
