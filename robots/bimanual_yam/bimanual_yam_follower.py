@@ -187,14 +187,14 @@ class BimanualYAMFollower(Robot):
         obs = {}
         
         # Get left arm observation
-        left_states = self.left_motor_chain.get_motor_states()
+        left_states = self.left_motor_chain.read_states()
         for i, state in enumerate(left_states):
             obs[f"left_joint_{i}.pos"] = state.pos
             obs[f"left_joint_{i}.vel"] = state.vel
             obs[f"left_joint_{i}.eff"] = state.eff
         
         # Get right arm observation
-        right_states = self.right_motor_chain.get_motor_states()
+        right_states = self.right_motor_chain.read_states()
         for i, state in enumerate(right_states):
             obs[f"right_joint_{i}.pos"] = state.pos
             obs[f"right_joint_{i}.vel"] = state.vel
