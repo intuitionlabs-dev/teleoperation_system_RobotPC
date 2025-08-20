@@ -94,83 +94,62 @@ class BimanualYAMFollower(Robot):
         logger.info(f"{self.name} connected.")
     
     def _setup_hardware(self):
-        """Setup YAM robot hardware in separate threads to avoid blocking."""
-        # Import necessary modules
+        """Setup YAM robot hardware using direct motor control interfaces."""
+        # Import necessary modules for direct motor control
         try:
-            from i2rt.robots.get_robot import get_yam_robot
-            from gello.zmq_core.robot_node import ZMQClientRobot, ZMQServerRobot
+            from i2rt.motor_drivers.dm_driver import DMChainCanInterface
+            from i2rt.utils.mujoco_utils import MuJoCoKDL
         except ImportError as e:
-            logger.error(f"Failed to import modules: {e}")
+            logger.error(f"Failed to import i2rt modules: {e}")
             logger.error("Make sure i2rt is in PYTHONPATH")
             raise
         
-        self._ZMQClientRobot = ZMQClientRobot
-        self._ZMQServerRobot = ZMQServerRobot
+        # Motor configuration for YAM (7 motors per arm)
+        motor_ids = [1, 2, 3, 4, 5, 6, 7]
+        motor_types = ["DM4340", "DM4340", "DM4340", "DM4310", "DM4310", "DM4310", "DM4310"]
         
-        # Function to initialize robot in a thread
-        def init_robot_with_zmq(channel, port, name):
-            """Initialize robot and wrap it with ZMQ server."""
-            logger.info(f"Initializing {name} on channel {channel}")
-            robot = get_yam_robot(channel=channel)
-            
-            # Create ZMQ server for the robot
-            server = self._ZMQServerRobot(
-                robot,
-                port=port,
-                host="127.0.0.1"
+        # Setup left arm
+        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
+        try:
+            # Create motor chain for left arm
+            self.left_motor_chain = DMChainCanInterface(
+                channel=self.config.left_arm.channel,
+                motor_ids=motor_ids,
+                motor_types=motor_types,
+                gravity_compensation=True,
+                gripper_motor_id=7,
+                gripper_motor_type="DM4310"
             )
             
-            # Store references
-            if name == "left":
-                self.left_robot = robot
-                self.left_server = server
-            else:
-                self.right_robot = robot
-                self.right_server = server
-            
-            # Start serving (this will block)
-            server.serve()
+            # Store initial positions
+            self.left_positions = [0.0] * 7
+            logger.info("Left YAM arm initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize left YAM arm: {e}")
+            raise
         
-        # Setup left arm in a thread
-        logger.info(f"Setting up left YAM arm on channel {self.config.left_arm.channel}")
-        self.left_thread = threading.Thread(
-            target=init_robot_with_zmq,
-            args=(self.config.left_arm.channel, self.config.left_arm.hardware_port, "left"),
-            daemon=False
-        )
-        self.left_thread.start()
-        
-        # Wait a bit for the server to start
-        time.sleep(2)
-        
-        # Create client for left arm
-        self.left_client = self._ZMQClientRobot(
-            port=self.config.left_arm.hardware_port,
-            host="127.0.0.1"
-        )
-        logger.info("Left YAM arm initialized successfully")
-        
-        # Setup right arm in a thread
+        # Setup right arm
         logger.info("Waiting 3 seconds before initializing right arm (CAN bus delay)...")
         time.sleep(3)
         
         logger.info(f"Setting up right YAM arm on channel {self.config.right_arm.channel}")
-        self.right_thread = threading.Thread(
-            target=init_robot_with_zmq,
-            args=(self.config.right_arm.channel, self.config.right_arm.hardware_port, "right"),
-            daemon=False
-        )
-        self.right_thread.start()
-        
-        # Wait a bit for the server to start
-        time.sleep(2)
-        
-        # Create client for right arm
-        self.right_client = self._ZMQClientRobot(
-            port=self.config.right_arm.hardware_port,
-            host="127.0.0.1"
-        )
-        logger.info("Right YAM arm initialized successfully")
+        try:
+            # Create motor chain for right arm
+            self.right_motor_chain = DMChainCanInterface(
+                channel=self.config.right_arm.channel,
+                motor_ids=motor_ids,
+                motor_types=motor_types,
+                gravity_compensation=True,
+                gripper_motor_id=7,
+                gripper_motor_type="DM4310"
+            )
+            
+            # Store initial positions
+            self.right_positions = [0.0] * 7
+            logger.info("Right YAM arm initialized successfully")
+        except Exception as e:
+            logger.error(f"Failed to initialize right YAM arm: {e}")
+            raise
         
         logger.info("Both YAM arms initialized successfully")
     
@@ -194,15 +173,19 @@ class BimanualYAMFollower(Robot):
         
         obs = {}
         
-        # Get left arm observation through ZMQ client
-        left_obs = self.left_client.get_observation()
-        for key, val in left_obs.items():
-            obs[f"left_{key}"] = val
+        # Get left arm observation
+        left_states = self.left_motor_chain.get_motor_states()
+        for i, state in enumerate(left_states):
+            obs[f"left_joint_{i}.pos"] = state.pos
+            obs[f"left_joint_{i}.vel"] = state.vel
+            obs[f"left_joint_{i}.eff"] = state.eff
         
-        # Get right arm observation through ZMQ client
-        right_obs = self.right_client.get_observation()
-        for key, val in right_obs.items():
-            obs[f"right_{key}"] = val
+        # Get right arm observation
+        right_states = self.right_motor_chain.get_motor_states()
+        for i, state in enumerate(right_states):
+            obs[f"right_joint_{i}.pos"] = state.pos
+            obs[f"right_joint_{i}.vel"] = state.vel
+            obs[f"right_joint_{i}.eff"] = state.eff
         
         return obs
     
@@ -211,30 +194,34 @@ class BimanualYAMFollower(Robot):
         if not self._is_connected:
             raise RuntimeError(f"{self.name} is not connected")
         
-        # Split action into left and right components
-        left_action = {}
-        right_action = {}
-        
-        for key, val in action.items():
-            if key.startswith("left_"):
-                # Remove prefix for the individual arm
-                left_action[key.removeprefix("left_")] = val
-            elif key.startswith("right_"):
-                # Remove prefix for the individual arm
-                right_action[key.removeprefix("right_")] = val
+        # Extract positions for left arm
+        left_positions = []
+        for i in range(7):
+            key = f"left_joint_{i}.pos"
+            if key in action:
+                left_positions.append(action[key])
             else:
-                logger.warning(f"Action key without arm prefix: {key}")
+                # Use current position if not specified
+                left_positions.append(self.left_positions[i])
         
-        # Send through ZMQ clients
-        if left_action:
-            self.left_client.send_action(left_action)
-        else:
-            logger.warning("No left arm actions in command")
+        # Extract positions for right arm
+        right_positions = []
+        for i in range(7):
+            key = f"right_joint_{i}.pos"
+            if key in action:
+                right_positions.append(action[key])
+            else:
+                # Use current position if not specified
+                right_positions.append(self.right_positions[i])
         
-        if right_action:
-            self.right_client.send_action(right_action)
-        else:
-            logger.warning("No right arm actions in command")
+        # Send commands to motors
+        if left_positions:
+            self.left_motor_chain.send_position_commands(left_positions)
+            self.left_positions = left_positions
+        
+        if right_positions:
+            self.right_motor_chain.send_position_commands(right_positions)
+            self.right_positions = right_positions
         
         return action
     
@@ -245,23 +232,18 @@ class BimanualYAMFollower(Robot):
         
         logger.info(f"Disconnecting {self.name}...")
         
-        # Close clients
-        if hasattr(self, 'left_client') and self.left_client:
-            self.left_client.close()
-        if hasattr(self, 'right_client') and self.right_client:
-            self.right_client.close()
+        # Close motor chains
+        if hasattr(self, 'left_motor_chain') and self.left_motor_chain:
+            try:
+                self.left_motor_chain.close()
+            except Exception as e:
+                logger.warning(f"Error closing left motor chain: {e}")
         
-        # Close servers
-        if hasattr(self, 'left_server') and self.left_server:
-            self.left_server.close()
-        if hasattr(self, 'right_server') and self.right_server:
-            self.right_server.close()
-        
-        # Wait for threads
-        if hasattr(self, 'left_thread') and self.left_thread:
-            self.left_thread.join(timeout=2)
-        if hasattr(self, 'right_thread') and self.right_thread:
-            self.right_thread.join(timeout=2)
+        if hasattr(self, 'right_motor_chain') and self.right_motor_chain:
+            try:
+                self.right_motor_chain.close()
+            except Exception as e:
+                logger.warning(f"Error closing right motor chain: {e}")
         
         self._is_connected = False
         logger.info(f"{self.name} disconnected.")
