@@ -53,17 +53,13 @@ def test_can_channel(channel: str):
         
         for motor_id, motor_type in motor_types.items():
             try:
-                # Try to enable motor
+                # Try to enable motor using motor_on method
                 logger.info(f"  Testing motor {motor_id} ({motor_type})...")
                 
-                # Send enable command
-                data = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFC]
-                motor_interface._send_message(motor_id, data)
+                # Try to turn on motor and get response
+                motor_info = motor_interface.motor_on(motor_id, motor_type)
                 
-                # Try to receive response
-                response = motor_interface.try_receive_message(timeout=0.1)
-                
-                if response:
+                if motor_info:
                     responsive_motors.append(motor_id)
                     logger.info(f"    ✓ Motor {motor_id} responded")
                 else:

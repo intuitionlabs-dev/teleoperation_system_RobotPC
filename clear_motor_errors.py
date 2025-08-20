@@ -38,15 +38,13 @@ def clear_motor_errors(channel: str, motor_ids: list):
         for motor_id in motor_ids:
             logger.info(f"Clearing errors on motor {motor_id}")
             try:
-                # Send reset/clear error command
-                # DM motors typically clear errors by sending enable command
-                data = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFC]  # Enable motor
-                motor_interface._send_message(motor_id, data)
+                # Use clean_error method to clear motor errors
+                motor_interface.clean_error(motor_id)
                 time.sleep(0.1)
                 
-                # Try to read motor state
-                data = [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFD]  # Read state
-                motor_interface._send_message(motor_id, data)
+                # Try to enable motor to verify it's working
+                motor_type = "DM4340" if motor_id <= 3 else "DM4310"
+                motor_interface.motor_on(motor_id, motor_type)
                 time.sleep(0.1)
                 
             except Exception as e:
