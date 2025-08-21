@@ -33,11 +33,26 @@ cd piper_sdk && pip install -e . && cd ..
 ```
 
 This automatically:
+- Installs tmux if not present (auto-installation)
 - Cleans CAN interfaces (runs cleanup_can_motors.sh and force_reset_can.sh)
 - Launches left arm hardware server (port 6001)
 - Launches right arm hardware server (port 6003)  
 - Starts host broadcast (ports 5565-5568)
+- Creates tmux session with all components
 - Waits for remote commands
+
+**Tmux Management:**
+```bash
+# View running session
+tmux attach -t yam_teleop
+
+# Stop all components
+tmux kill-session -t yam_teleop
+
+# Inside tmux:
+# Ctrl-b + 0/1/2: Switch windows
+# Ctrl-b + d: Detach (keeps running)
+```
 
 #### For Piper System
 ```bash

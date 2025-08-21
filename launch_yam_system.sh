@@ -17,11 +17,16 @@ echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}YAM Teleoperation System Launcher${NC}"
 echo -e "${GREEN}=========================================${NC}"
 
-# Check if tmux is installed
+# Check if tmux is installed, install if needed
 if ! command -v tmux &> /dev/null; then
-    echo -e "${RED}Error: tmux is not installed${NC}"
-    echo "Please install tmux: sudo apt-get install tmux"
-    exit 1
+    echo -e "${YELLOW}tmux is not installed. Installing automatically...${NC}"
+    sudo apt-get update && sudo apt-get install -y tmux
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}Failed to install tmux automatically${NC}"
+        echo "Please install manually: sudo apt-get install tmux"
+        exit 1
+    fi
+    echo -e "${GREEN}tmux installed successfully${NC}"
 fi
 
 # Kill existing session if it exists
