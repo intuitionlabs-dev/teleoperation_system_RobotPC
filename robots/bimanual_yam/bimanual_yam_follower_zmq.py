@@ -27,6 +27,8 @@ class BimanualYAMFollowerZMQ(Robot):
         super().__init__(config)
         self.config = config
         self._is_connected = False
+        self._last_left_positions = None  # Store last valid left arm positions
+        self._last_right_positions = None  # Store last valid right arm positions
         
         # Add gello_software to path
         if Path(config.gello_path).is_absolute():
@@ -207,25 +209,47 @@ class BimanualYAMFollowerZMQ(Robot):
         
         import numpy as np
         
-        # Extract positions for left arm
+        # Check if this is a valid action
+        has_left_keys = any(k.startswith("left_joint") for k in action.keys())
+        has_right_keys = any(k.startswith("right_joint") for k in action.keys())
+        
+        if not has_left_keys and not has_right_keys:
+            logger.warning("No valid YAM action keys found - ignoring action to prevent unwanted movement")
+            return action
+        
+        # Initialize last positions if needed
+        if self._last_left_positions is None:
+            try:
+                obs = self.get_observation()
+                self._last_left_positions = [obs.get(f"left_joint_{i}.pos", 0.0) for i in range(7)]
+                self._last_right_positions = [obs.get(f"right_joint_{i}.pos", 0.0) for i in range(7)]
+            except:
+                self._last_left_positions = [0.0] * 7
+                self._last_right_positions = [0.0] * 7
+        
+        # Extract positions for left arm, using last valid positions as fallback
         left_positions = []
         for i in range(7):
             key = f"left_joint_{i}.pos"
             if key in action:
                 left_positions.append(action[key])
             else:
-                # Use zero position if not specified
-                left_positions.append(0.0)
+                # Use last valid position instead of zero
+                left_positions.append(self._last_left_positions[i])
         
-        # Extract positions for right arm
+        # Extract positions for right arm, using last valid positions as fallback
         right_positions = []
         for i in range(7):
             key = f"right_joint_{i}.pos"
             if key in action:
                 right_positions.append(action[key])
             else:
-                # Use zero position if not specified
-                right_positions.append(0.0)
+                # Use last valid position instead of zero
+                right_positions.append(self._last_right_positions[i])
+        
+        # Update last valid positions
+        self._last_left_positions = left_positions
+        self._last_right_positions = right_positions
         
         # Send commands to arms via ZMQ
         try:

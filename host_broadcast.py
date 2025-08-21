@@ -158,6 +158,7 @@ def main(cfg: BroadcastHostConfig):
     
     first_cmd = False
     max_loop_hz = cfg.max_loop_freq_hz
+    last_valid_action = None  # Store last valid action
     
     logging.info(f"{cfg.system} Host ready on ports {port_cmd}-{port_obs_broadcast} - waiting for teleop...")
     try:
@@ -170,15 +171,33 @@ def main(cfg: BroadcastHostConfig):
                 except json.JSONDecodeError:
                     logging.warning("Received a malformed JSON message, skipping.")
                     continue
-                if not first_cmd:
-                    logging.info("First teleop action received - starting loop.")
-                    first_cmd = True
-                logging.debug(f"Host received action: {data}")
-                robot.send_action(data)
                 
-                # Broadcast command
-                pub_cmd.send_string(msg)
+                # Validate action before sending to robot
+                if data and isinstance(data, dict) and len(data) > 0:
+                    # Check if this is a valid action (has expected keys)
+                    # For bimanual systems, should have left_ and right_ prefixed keys
+                    has_left_keys = any(k.startswith("left_") for k in data.keys())
+                    has_right_keys = any(k.startswith("right_") for k in data.keys())
+                    # For single arm, should have joint keys
+                    has_joint_keys = any("joint" in k or "shoulder" in k or "elbow" in k or 
+                                       "wrist" in k or "gripper" in k for k in data.keys())
+                    
+                    if has_left_keys or has_right_keys or has_joint_keys:
+                        if not first_cmd:
+                            logging.info("First teleop action received - starting loop.")
+                            first_cmd = True
+                        logging.debug(f"Host received valid action: {data}")
+                        robot.send_action(data)
+                        last_valid_action = data
+                        
+                        # Broadcast command
+                        pub_cmd.send_string(msg)
+                    else:
+                        logging.warning(f"Received action with no valid joint keys, ignoring: {list(data.keys())}")
+                else:
+                    logging.warning("Received empty or invalid action, ignoring")
             except zmq.Again:
+                # No new message - this is normal, just continue
                 pass
             
             # Get observation each cycle
