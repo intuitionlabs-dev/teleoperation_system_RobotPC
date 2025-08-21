@@ -12,8 +12,8 @@ source $HOME/.cargo/env
 
 ### 2. Clone and Setup
 ```bash
-git clone <repository_url> teleoperation_system_RobotPC_yam+piper
-cd teleoperation_system_RobotPC_yam+piper
+git clone <repository_url> teleoperation_system_RobotPC_yam-piper
+cd teleoperation_system_RobotPC_yam-piper
 
 # Create environment and install dependencies
 uv venv .venv

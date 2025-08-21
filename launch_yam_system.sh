@@ -36,12 +36,13 @@ trap cleanup EXIT INT TERM
 # Step 1: Clean CAN interfaces
 echo -e "\n${YELLOW}Step 1: Cleaning CAN interfaces...${NC}"
 if [ -f "scripts/cleanup_can_motors.sh" ]; then
-    sh scripts/cleanup_can_motors.sh
-    sh scripts/force_reset_can.sh
+    # Run in subshell to prevent early exit
+    (sh scripts/cleanup_can_motors.sh)
+    (sh scripts/force_reset_can.sh)
 elif [ -f "../scripts/cleanup_can_motors.sh" ]; then
     # Fallback to parent directory if needed
-    sh ../scripts/cleanup_can_motors.sh
-    sh ../scripts/force_reset_can.sh
+    (sh ../scripts/cleanup_can_motors.sh)
+    (sh ../scripts/force_reset_can.sh)
 else
     echo -e "${RED}Warning: CAN cleanup scripts not found${NC}"
     echo -e "${RED}Please run manually:${NC}"
