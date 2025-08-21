@@ -1,10 +1,30 @@
 # Core dependencies for RobotPC teleoperation
-# Versions based on lerobot_piper/pyproject.toml
 
 # Core packages
 draccus>=0.9.3
 pyzmq>=26.2.1
+numpy>=2.0.0
+omegaconf>=2.3.0
+tyro>=0.9.0
 
-# Piper robot control dependencies
+# Robot control - Piper
 python-can>=3.3.4  # Required by piper_sdk
 # piper-sdk>=0.3.2  # Installed locally from piper_sdk/ with pip install -e .
+
+# Robot control - YAM
+mujoco>=3.3.0
+python-can>=4.5.0  # Updated version for YAM
+pyserial>=3.5
+dynamixel-sdk>=3.7.0
+
+# Utilities
+termcolor>=2.4.0
+dacite>=1.8.0
+pyyaml>=6.0
+
+# Data processing
+pandas>=2.2.0
+h5py>=3.10.0
+
+# System monitoring
+psutil>=5.9.0
