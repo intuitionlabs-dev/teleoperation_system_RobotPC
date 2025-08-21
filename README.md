@@ -34,13 +34,52 @@ uv pip install -r requirements.txt
 
 ### Quick Start
 
+#### Piper System
 ```bash
-# For Piper system (default)
+# Single step - Just run the host broadcast
 ./run_host_broadcast.sh
+```
 
-# For YAM system
+#### YAM System (Two-Layer Architecture)
+```bash
+# Step 0: Clean up CAN interfaces (RECOMMENDED before starting)
+# This prevents stuck CAN bus issues from previous runs
+cd /home/group/i2rt
+sh scripts/cleanup_can_motors.sh
+sh scripts/force_reset_can.sh
+# Note: force_reset_can.sh requires sudo and will be more aggressive in resetting
+
+# Step 1: Launch hardware servers (in separate terminals)
+# These servers directly control the motors via CAN interfaces
+
+# Terminal 1 - Left arm hardware server (port 6001)
+cd /home/group/i2rt/gello_software
+source .venv/bin/activate
+python experiments/launch_yaml.py --left-config-path configs/yam_auto_generated_left.yaml
+
+# Terminal 2 - Right arm hardware server (port 6003)
+# IMPORTANT: Edit launch_yaml.py first to change hardware_port from 6001 to 6003
+cd /home/group/i2rt/gello_software
+source .venv/bin/activate
+python experiments/launch_yaml.py --left-config-path configs/yam_auto_generated_right.yaml
+
+# Step 2: Launch host broadcast (in a new terminal)
+# This bridges between remote leader arms and local hardware servers
+cd /home/group/i2rt/teleoperation_system_RobotPC
 ./run_host_broadcast.sh --system yam-dynamixel
 ```
+
+### Architecture Overview
+
+#### Piper System
+- **Single Layer**: Host broadcast directly controls motors via Piper SDK
+- Data flow: Remote Leader → Host Broadcast → Piper Motors
+
+#### YAM System  
+- **Two Layer**: Host broadcast connects to hardware servers via ZMQ
+- Data flow: Remote Leader → Host Broadcast → Hardware Servers → CAN/Motors
+- Hardware servers handle low-level motor control and CAN communication
+- Host broadcast handles network communication and command routing
 
 ### Manual Commands
 
@@ -58,6 +97,7 @@ python -m host_broadcast \
 
 #### YAM System
 ```bash
+# Requires hardware servers to be running first (see Quick Start above)
 python -m host_broadcast \
     --system yam-dynamixel \
     --yam_left_channel can_follow_l \
@@ -116,7 +156,9 @@ Features:
 ### YAM-Dynamixel System
 - Teleoperation: 5565-5568 (separated to avoid conflicts)
 - Motor enable: 5569
-- Hardware servers: 6001-6002
+- Hardware servers: 
+  - Left arm: 6001 (connects to can_follow_l)
+  - Right arm: 6003 (connects to can_follow_r)
 
 ### Common
 - Default IPs (via Tailscale):

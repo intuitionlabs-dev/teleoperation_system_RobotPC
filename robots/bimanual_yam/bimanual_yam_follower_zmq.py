@@ -92,8 +92,8 @@ class BimanualYAMFollowerZMQ(Robot):
             logger.error(f"Failed to import gello modules: {e}")
             raise
         
-        # Connect to left arm server (port 6001)
-        left_port = 6001
+        # Connect to left arm server
+        left_port = self.config.left_arm.hardware_port
         logger.info(f"Connecting to left YAM arm on port {left_port}...")
         try:
             self.left_client = ZMQClientRobot(port=left_port, host="127.0.0.1")
@@ -105,8 +105,8 @@ class BimanualYAMFollowerZMQ(Robot):
         # Wait before connecting to right arm
         time.sleep(2)
         
-        # Connect to right arm server (port 6003)
-        right_port = 6003
+        # Connect to right arm server
+        right_port = self.config.right_arm.hardware_port
         logger.info(f"Connecting to right YAM arm on port {right_port}...")
         try:
             self.right_client = ZMQClientRobot(port=right_port, host="127.0.0.1")
