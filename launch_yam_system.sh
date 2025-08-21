@@ -1,6 +1,6 @@
 #!/bin/bash
-# Unified launch script for YAM teleoperation system
-# This script launches both hardware servers and the host broadcast
+# Unified launch script for YAM teleoperation system using tmux
+# Creates 4 tmux windows: CAN cleanup, Left arm, Right arm, Host broadcast
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
@@ -11,93 +11,96 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+SESSION_NAME="yam_teleop"
+
 echo -e "${GREEN}=========================================${NC}"
 echo -e "${GREEN}YAM Teleoperation System Launcher${NC}"
 echo -e "${GREEN}=========================================${NC}"
 
-# Function to cleanup on exit
-cleanup() {
-    echo -e "\n${YELLOW}Shutting down all processes...${NC}"
-    
-    # Kill all child processes
-    jobs -p | xargs -r kill 2>/dev/null
-    
-    # Kill processes by name as backup
-    pkill -f "launch_hardware_server.py" 2>/dev/null
-    pkill -f "host_broadcast" 2>/dev/null
-    
-    echo -e "${GREEN}Cleanup complete${NC}"
-    exit 0
-}
-
-# Set up trap for cleanup
-trap cleanup EXIT INT TERM
-
-# Step 1: Clean CAN interfaces
-echo -e "\n${YELLOW}Step 1: Cleaning CAN interfaces...${NC}"
-if [ -f "scripts/cleanup_can_motors.sh" ]; then
-    # Run in subshell to prevent early exit
-    (sh scripts/cleanup_can_motors.sh)
-    (sh scripts/force_reset_can.sh)
-elif [ -f "../scripts/cleanup_can_motors.sh" ]; then
-    # Fallback to parent directory if needed
-    (sh ../scripts/cleanup_can_motors.sh)
-    (sh ../scripts/force_reset_can.sh)
-else
-    echo -e "${RED}Warning: CAN cleanup scripts not found${NC}"
-    echo -e "${RED}Please run manually:${NC}"
-    echo "  sh scripts/cleanup_can_motors.sh"
-    echo "  sh scripts/force_reset_can.sh"
+# Check if tmux is installed
+if ! command -v tmux &> /dev/null; then
+    echo -e "${RED}Error: tmux is not installed${NC}"
+    echo "Please install tmux: sudo apt-get install tmux"
+    exit 1
 fi
 
-# Step 2: Activate virtual environment
-echo -e "\n${YELLOW}Step 2: Setting up environment...${NC}"
+# Kill existing session if it exists
+echo "Cleaning up any existing sessions..."
+tmux kill-session -t $SESSION_NAME 2>/dev/null
+
+# Check virtual environment
 if [ ! -d ".venv" ]; then
-    echo "Virtual environment not found. Creating with uv..."
+    echo "Creating virtual environment..."
     uv venv .venv
     source .venv/bin/activate
     uv pip install -r requirements.txt
-else
-    source .venv/bin/activate
 fi
 
-# Step 3: Launch left arm hardware server
-echo -e "\n${YELLOW}Step 3: Launching left arm hardware server...${NC}"
-python launch_hardware_server.py --arm left &
-LEFT_PID=$!
-echo "Left arm server PID: $LEFT_PID"
+echo -e "\n${YELLOW}Step 1: Resetting CAN interfaces...${NC}"
+# Only run the CAN reset, not the process killer
+# The force_reset_can.sh doesn't kill processes, just resets CAN
+if [ -f "scripts/force_reset_can.sh" ]; then
+    sh scripts/force_reset_can.sh
+    echo -e "${GREEN}CAN interfaces reset${NC}"
+else
+    echo -e "${YELLOW}Warning: force_reset_can.sh not found, skipping CAN reset${NC}"
+fi
 
-# Wait a bit for left arm to initialize
+echo -e "\n${YELLOW}Creating tmux session with 3 windows...${NC}"
+
+# Create new detached tmux session with first window for left arm
+tmux new-session -d -s $SESSION_NAME -n "Left_Arm"
+
+# Window 1: Left Arm
+echo "  [1/3] Setting up left arm window..."
+tmux send-keys -t $SESSION_NAME:0 "cd $SCRIPT_DIR" C-m
+tmux send-keys -t $SESSION_NAME:0 "source .venv/bin/activate" C-m
+tmux send-keys -t $SESSION_NAME:0 "echo '==== LEFT ARM - Port 6001 ===='" C-m
+tmux send-keys -t $SESSION_NAME:0 "python launch_hardware_server.py --arm left" C-m
+
+# Wait for left arm to initialize
 sleep 3
 
-# Step 4: Launch right arm hardware server
-echo -e "\n${YELLOW}Step 4: Launching right arm hardware server...${NC}"
-python launch_hardware_server.py --arm right &
-RIGHT_PID=$!
-echo "Right arm server PID: $RIGHT_PID"
+# Window 2: Right Arm
+echo "  [2/3] Setting up right arm window..."
+tmux new-window -t $SESSION_NAME:1 -n "Right_Arm"
+tmux send-keys -t $SESSION_NAME:1 "cd $SCRIPT_DIR" C-m
+tmux send-keys -t $SESSION_NAME:1 "source .venv/bin/activate" C-m
+tmux send-keys -t $SESSION_NAME:1 "echo '==== RIGHT ARM - Port 6003 ===='" C-m
+tmux send-keys -t $SESSION_NAME:1 "python launch_hardware_server.py --arm right" C-m
 
-# Wait for hardware servers to be ready
+# Wait for right arm to initialize
 sleep 3
 
-# Step 5: Launch host broadcast
-echo -e "\n${YELLOW}Step 5: Launching host broadcast...${NC}"
-python -m host_broadcast --system yam-dynamixel &
-BROADCAST_PID=$!
-echo "Host broadcast PID: $BROADCAST_PID"
+# Window 3: Host Broadcast
+echo "  [3/3] Setting up host broadcast window..."
+tmux new-window -t $SESSION_NAME:2 -n "Host_Broadcast"
+tmux send-keys -t $SESSION_NAME:2 "cd $SCRIPT_DIR" C-m
+tmux send-keys -t $SESSION_NAME:2 "source .venv/bin/activate" C-m
+tmux send-keys -t $SESSION_NAME:2 "echo '==== HOST BROADCAST - Ports 5565-5568 ===='" C-m
+tmux send-keys -t $SESSION_NAME:2 "python -m host_broadcast --system yam-dynamixel" C-m
 
-# Summary
+# Select the host broadcast window by default
+tmux select-window -t $SESSION_NAME:2
+
 echo -e "\n${GREEN}=========================================${NC}"
-echo -e "${GREEN}System Launch Complete!${NC}"
+echo -e "${GREEN}✓ System Launch Complete!${NC}"
 echo -e "${GREEN}=========================================${NC}"
 echo ""
-echo "Running processes:"
-echo "  - Left arm server (PID: $LEFT_PID) on port 6001"
-echo "  - Right arm server (PID: $RIGHT_PID) on port 6003"
-echo "  - Host broadcast (PID: $BROADCAST_PID) on ports 5565-5568"
+echo "Tmux session '$SESSION_NAME' created with 3 windows:"
+echo "  Window 0: Left Arm Server (port 6001)"
+echo "  Window 1: Right Arm Server (port 6003)"
+echo "  Window 2: Host Broadcast (ports 5565-5568)"
 echo ""
-echo "The system is ready to receive commands from the remote operator."
-echo "Press Ctrl+C to stop all processes."
+echo -e "${YELLOW}Commands:${NC}"
+echo "  View session:  tmux attach -t $SESSION_NAME"
+echo "  Stop all:      tmux kill-session -t $SESSION_NAME"
+echo "  List windows:  tmux list-windows -t $SESSION_NAME"
 echo ""
-
-# Keep script running
-wait
+echo -e "${YELLOW}Inside tmux:${NC}"
+echo "  Ctrl-b + 0-2:  Switch to window 0-2"
+echo "  Ctrl-b + n:    Next window"
+echo "  Ctrl-b + p:    Previous window"
+echo "  Ctrl-b + d:    Detach (keeps running)"
+echo ""
+echo -e "${GREEN}System is running in background. Attach to view.${NC}"

@@ -13,6 +13,7 @@ python-can>=3.3.4  # Required by piper_sdk
 
 # Robot control - YAM
 mujoco>=3.3.0
+dm-env>=1.6  # Required for robot interface
 python-can>=4.5.0  # Updated version for YAM
 pyserial>=3.5
 dynamixel-sdk>=3.7.0
