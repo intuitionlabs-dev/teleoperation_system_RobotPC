@@ -6,9 +6,10 @@ __pycache__/
 .Python
 
 # Virtual Environment
-venv/
+.venv/
 ENV/
 env/
+venv/
 
 # IDE
 .vscode/
