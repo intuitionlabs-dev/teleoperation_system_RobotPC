@@ -260,8 +260,8 @@ class BimanualYAMFollowerZMQ(Robot):
             # Send position commands to right arm
             self.right_client.command_joint_state(np.array(right_positions))
             
-            logger.debug(f"Sent left positions: {left_positions[:3]}...")
-            logger.debug(f"Sent right positions: {right_positions[:3]}...")
+            logger.debug(f"Sent ALL left positions (7): {left_positions}")
+            logger.debug(f"Sent ALL right positions (7): {right_positions}")
             
         except Exception as e:
             logger.error(f"Error sending commands via ZMQ: {e}")

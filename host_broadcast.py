@@ -22,7 +22,7 @@ from robots.piper.config import PiperConfig
 class BroadcastHostConfig:
     """Configuration for the broadcast host."""
     # System selection
-    system: Literal["piper-so101", "yam-dynamixel"] = "piper-so101"
+    system: Literal["piper-so101", "yam-dynamixel", "x5-dynamixel"] = "piper-so101"
     """Which robot system to use."""
     
     # Piper configuration
@@ -47,6 +47,12 @@ class BroadcastHostConfig:
     yam_port_zmq_observations: int = 5566
     yam_port_cmd_broadcast: int = 5567
     yam_port_obs_broadcast: int = 5568
+    
+    # X5 system uses different ports from both Piper and YAM
+    x5_port_zmq_cmd: int = 5575
+    x5_port_zmq_observations: int = 5576
+    x5_port_cmd_broadcast: int = 5577
+    x5_port_obs_broadcast: int = 5578
 
 
 @draccus.wrap()
@@ -120,6 +126,33 @@ def main(cfg: BroadcastHostConfig):
             logging.info("Configuring Bimanual YAM with direct motor control")
             robot = BimanualYAMFollower(robot_config)
         
+    elif cfg.system == "x5-dynamixel":
+        # X5 system configuration - similar to YAM but with X5 robot
+        import sys
+        import os
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        
+        # Always use ZMQ connection for X5
+        from robots.bimanual_yam.bimanual_yam_follower_zmq import BimanualYAMFollowerZMQ
+        from robots.bimanual_yam.config import BimanualYAMFollowerConfig, YAMConfig
+        
+        robot_config = BimanualYAMFollowerConfig(
+            left_arm=YAMConfig(
+                channel="can1",  # X5 left arm uses can1
+                hardware_port=6001,
+                id="left"
+            ),
+            right_arm=YAMConfig(
+                channel="can0",  # X5 right arm uses can0
+                hardware_port=6003,
+                id="right"
+            ),
+            gello_path=cfg.yam_gello_path,
+            id="bimanual",
+        )
+        logging.info("Configuring Bimanual X5 with ZMQ connection to hardware servers")
+        robot = BimanualYAMFollowerZMQ(robot_config)
+        
     else:
         raise ValueError(f"Unknown system: {cfg.system}")
     
@@ -132,6 +165,11 @@ def main(cfg: BroadcastHostConfig):
         port_obs = cfg.yam_port_zmq_observations
         port_cmd_broadcast = cfg.yam_port_cmd_broadcast
         port_obs_broadcast = cfg.yam_port_obs_broadcast
+    elif cfg.system == "x5-dynamixel":
+        port_cmd = cfg.x5_port_zmq_cmd
+        port_obs = cfg.x5_port_zmq_observations
+        port_cmd_broadcast = cfg.x5_port_cmd_broadcast
+        port_obs_broadcast = cfg.x5_port_obs_broadcast
     else:  # piper-so101
         port_cmd = cfg.port_zmq_cmd
         port_obs = cfg.port_zmq_observations

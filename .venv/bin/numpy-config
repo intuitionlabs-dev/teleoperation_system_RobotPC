@@ -1,0 +1,7 @@
+#!/home/group/i2rt/teleoperation_system_RobotPC_X5-yam-piper/.venv/bin/python3.10
+import sys
+from numpy._configtool import main
+if __name__ == '__main__':
+    if sys.argv[0].endswith('.exe'):
+        sys.argv[0] = sys.argv[0][:-4]
+    sys.exit(main())

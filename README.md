@@ -1,6 +1,6 @@
 # Robot PC - Teleoperation System
 
-Controls follower arms (Piper or YAM) via network commands from remote leader arms.
+Controls follower arms (Piper, YAM, or X5) via network commands from remote leader arms.
 
 ## Quick Start
 
@@ -25,6 +25,34 @@ cd piper_sdk && pip install -e . && cd ..
 ```
 
 ### 3. Launch System
+
+#### For X5 System (Dual Arms)
+```bash
+# One command launches everything!
+./launch_x5_system.sh
+```
+
+This automatically:
+- Installs tmux if not present
+- Sets up CAN interfaces for X5 (can0/can1)
+- Launches left arm hardware server (port 6001)
+- Launches right arm hardware server (port 6003)
+- Starts host broadcast (ports 5575-5578)
+- Creates tmux session with all components
+- Waits for remote commands
+
+**Tmux Management:**
+```bash
+# View running session
+tmux attach -t x5_teleop
+
+# Stop all components
+tmux kill-session -t x5_teleop
+
+# Inside tmux:
+# Ctrl-b + 0/1/2: Switch windows
+# Ctrl-b + d: Detach (keeps running)
+```
 
 #### For YAM System (Dual Arms)
 ```bash
@@ -61,6 +89,12 @@ tmux kill-session -t yam_teleop
 
 ## System Architecture
 
+### X5 System
+```
+Remote Leader Arms → Network → Host Broadcast → Hardware Servers → CAN/Motors
+                    (5575-5578)            (6001/6003)        (can0/can1)
+```
+
 ### YAM System
 ```
 Remote Leader Arms → Network → Host Broadcast → Hardware Servers → CAN/Motors
@@ -82,6 +116,9 @@ Remote Leader Arms → Network → Host Broadcast → Piper SDK → Motors
 | YAM | Teleoperation | 5565-5568 |
 | YAM | Motor enable | 5569 |
 | YAM | Hardware servers | 6001 (left), 6003 (right) |
+| X5 | Teleoperation | 5575-5578 |
+| X5 | Motor enable | 5579 |
+| X5 | Hardware servers | 6001 (left), 6003 (right) |
 
 ## Troubleshooting
 
@@ -94,13 +131,25 @@ sudo sh scripts/force_reset_can.sh
 
 ### Individual Component Launch
 
+#### X5 Hardware Servers
+```bash
+# Terminal 1 - Left arm
+python launch_hardware_server.py --arm left --system x5
+
+# Terminal 2 - Right arm  
+python launch_hardware_server.py --arm right --system x5
+
+# Terminal 3 - Host broadcast
+python -m host_broadcast --system x5-dynamixel
+```
+
 #### YAM Hardware Servers
 ```bash
 # Terminal 1 - Left arm
-python launch_hardware_server.py --arm left
+python launch_hardware_server.py --arm left --system yam
 
 # Terminal 2 - Right arm  
-python launch_hardware_server.py --arm right
+python launch_hardware_server.py --arm right --system yam
 
 # Terminal 3 - Host broadcast
 python -m host_broadcast --system yam-dynamixel

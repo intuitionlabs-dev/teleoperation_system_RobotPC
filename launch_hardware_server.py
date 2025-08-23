@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
-Hardware server launcher for YAM follower arms.
-This script launches a ZMQ server that exposes the YAM robot for remote control.
+Hardware server launcher for YAM/X5 follower arms.
+This script launches a ZMQ server that exposes the YAM or X5 robot for remote control.
 """
 
 import argparse
@@ -20,6 +20,7 @@ import zmq.error
 from omegaconf import OmegaConf
 
 from gello.robots.yam import YAMRobot
+from gello.robots.x5 import X5Robot
 from gello.zmq_core.robot_node import ZMQServerRobot
 
 # Global variables for cleanup
@@ -58,13 +59,20 @@ def signal_handler(signum, frame):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Launch YAM hardware server")
+    parser = argparse.ArgumentParser(description="Launch YAM/X5 hardware server")
     parser.add_argument(
         "--arm",
         type=str,
         choices=["left", "right"],
         required=True,
         help="Which arm to launch (left or right)"
+    )
+    parser.add_argument(
+        "--system",
+        type=str,
+        choices=["yam", "x5"],
+        default="yam",
+        help="Which robot system to use (yam or x5)"
     )
     parser.add_argument(
         "--port",
@@ -80,23 +88,45 @@ def main():
     )
     args = parser.parse_args()
 
-    # Set defaults based on arm
+    # Set defaults based on arm and system
     if args.arm == "left":
         port = args.port or 6001
-        can_channel = args.can_channel or "can_follow_l"
+        if args.system == "x5":
+            can_channel = args.can_channel or "can1"  # X5 left arm uses can1
+        else:
+            can_channel = args.can_channel or "can_follow_l"  # YAM left arm
     else:  # right
         port = args.port or 6003
-        can_channel = args.can_channel or "can_follow_r"
+        if args.system == "x5":
+            can_channel = args.can_channel or "can0"  # X5 right arm uses can0
+        else:
+            can_channel = args.can_channel or "can_follow_r"  # YAM right arm
 
     # Register cleanup handlers
     atexit.register(cleanup)
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    print(f"Initializing YAM {args.arm} arm on CAN channel: {can_channel}")
-    
-    # Create YAM robot
-    robot = YAMRobot(channel=can_channel)
+    # Create robot based on system type
+    if args.system == "x5":
+        print(f"Initializing X5 {args.arm} arm on CAN channel: {can_channel}")
+        robot = X5Robot(channel=can_channel)
+        system_name = "X5"
+        
+        # SAFETY: Read current position but don't command initially
+        print(f"Reading current position of X5 {args.arm} arm...")
+        try:
+            current_pos = robot.get_joint_state()
+            print(f"Current position: {current_pos}")
+            # Don't command position initially - wait for teleoperation
+            # The robot should maintain its current physical position
+            print(f"X5 {args.arm} arm ready - waiting for teleoperation commands")
+        except Exception as e:
+            print(f"Warning: Could not read initial position: {e}")
+    else:
+        print(f"Initializing YAM {args.arm} arm on CAN channel: {can_channel}")
+        robot = YAMRobot(channel=can_channel)
+        system_name = "YAM"
     
     # Create ZMQ server for the hardware robot
     hardware_host = "127.0.0.1"
@@ -111,7 +141,7 @@ def main():
     active_servers.append(server)
     
     print("\n" + "="*50)
-    print(f"YAM {args.arm.upper()} ARM Hardware Server Running")
+    print(f"{system_name} {args.arm.upper()} ARM Hardware Server Running")
     print(f"CAN Channel: {can_channel}")
     print(f"Listening on: {hardware_host}:{port}")
     print("Waiting for commands from host_broadcast...")
