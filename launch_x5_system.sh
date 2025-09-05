@@ -41,8 +41,21 @@ if [ ! -d ".venv" ]; then
     uv pip install -r requirements.txt
 fi
 
-# Set library path for ARX module
-export LD_LIBRARY_PATH=/home/group/i2rt/ARX-dynamixel/RobotLearningGello/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:$LD_LIBRARY_PATH
+# Build ARX X5 library if needed
+echo -e "\n${YELLOW}Building ARX X5 library...${NC}"
+if [ ! -f "$SCRIPT_DIR/ARX_X5/py/arx_x5_python/bimanual/api/arx_x5_python/arx_x5_python.cpython-310-aarch64-linux-gnu.so" ]; then
+    echo "ARX X5 library not found, building..."
+    source .venv/bin/activate
+    cd "$SCRIPT_DIR/ARX_X5/py/arx_x5_python"
+    ./build.sh
+    cd "$SCRIPT_DIR"
+else
+    echo "ARX X5 library already built"
+fi
+
+# Set library path and Python path for ARX module
+export LD_LIBRARY_PATH=$SCRIPT_DIR/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:$LD_LIBRARY_PATH
+export PYTHONPATH=$SCRIPT_DIR/ARX_X5/py:$PYTHONPATH
 
 echo -e "\n${YELLOW}Step 1: Resetting and setting up CAN interfaces for X5...${NC}"
 
@@ -131,7 +144,8 @@ tmux new-session -d -s $SESSION_NAME -n "X5_Left"
 # Window 1: Left Arm
 echo "  [1/3] Setting up X5 left arm window..."
 tmux send-keys -t $SESSION_NAME:0 "cd $SCRIPT_DIR" C-m
-tmux send-keys -t $SESSION_NAME:0 "export LD_LIBRARY_PATH=/home/group/i2rt/ARX-dynamixel/RobotLearningGello/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:\$LD_LIBRARY_PATH" C-m
+tmux send-keys -t $SESSION_NAME:0 "export LD_LIBRARY_PATH=$SCRIPT_DIR/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:\$LD_LIBRARY_PATH" C-m
+tmux send-keys -t $SESSION_NAME:0 "export PYTHONPATH=$SCRIPT_DIR/ARX_X5/py:\$PYTHONPATH" C-m
 tmux send-keys -t $SESSION_NAME:0 "source .venv/bin/activate" C-m
 tmux send-keys -t $SESSION_NAME:0 "echo '==== X5 LEFT ARM - Port 6001, CAN1 ===='" C-m
 tmux send-keys -t $SESSION_NAME:0 "python launch_hardware_server.py --arm left --system x5" C-m
@@ -143,7 +157,8 @@ sleep 3
 echo "  [2/3] Setting up X5 right arm window..."
 tmux new-window -t $SESSION_NAME:1 -n "X5_Right"
 tmux send-keys -t $SESSION_NAME:1 "cd $SCRIPT_DIR" C-m
-tmux send-keys -t $SESSION_NAME:1 "export LD_LIBRARY_PATH=/home/group/i2rt/ARX-dynamixel/RobotLearningGello/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:\$LD_LIBRARY_PATH" C-m
+tmux send-keys -t $SESSION_NAME:1 "export LD_LIBRARY_PATH=$SCRIPT_DIR/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:\$LD_LIBRARY_PATH" C-m
+tmux send-keys -t $SESSION_NAME:1 "export PYTHONPATH=$SCRIPT_DIR/ARX_X5/py:\$PYTHONPATH" C-m
 tmux send-keys -t $SESSION_NAME:1 "source .venv/bin/activate" C-m
 tmux send-keys -t $SESSION_NAME:1 "echo '==== X5 RIGHT ARM - Port 6003, CAN0 ===='" C-m
 tmux send-keys -t $SESSION_NAME:1 "python launch_hardware_server.py --arm right --system x5" C-m
@@ -155,7 +170,8 @@ sleep 3
 echo "  [3/3] Setting up host broadcast window..."
 tmux new-window -t $SESSION_NAME:2 -n "Host_Broadcast"
 tmux send-keys -t $SESSION_NAME:2 "cd $SCRIPT_DIR" C-m
-tmux send-keys -t $SESSION_NAME:2 "export LD_LIBRARY_PATH=/home/group/i2rt/ARX-dynamixel/RobotLearningGello/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:\$LD_LIBRARY_PATH" C-m
+tmux send-keys -t $SESSION_NAME:2 "export LD_LIBRARY_PATH=$SCRIPT_DIR/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src:\$LD_LIBRARY_PATH" C-m
+tmux send-keys -t $SESSION_NAME:2 "export PYTHONPATH=$SCRIPT_DIR/ARX_X5/py:\$PYTHONPATH" C-m
 tmux send-keys -t $SESSION_NAME:2 "source .venv/bin/activate" C-m
 tmux send-keys -t $SESSION_NAME:2 "echo '==== HOST BROADCAST - Ports 5575-5578 ===='" C-m
 tmux send-keys -t $SESSION_NAME:2 "python -m host_broadcast --system x5-dynamixel" C-m

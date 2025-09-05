@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC   -shared  -o arx_x5_python.cpython-310-aarch64-linux-gnu.so CMakeFiles/arx_x5_python.dir/src/single_arm_interface.cpp.o  -Wl,-rpath,/home/hexfellow/ARX_X5/py/arx_x5_python/bimanual/lib/arx_x5_src: -flto ../lib/arx_x5_src/libarx_x5_src-arm64.so 

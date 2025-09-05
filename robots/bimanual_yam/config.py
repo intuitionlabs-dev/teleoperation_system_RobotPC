@@ -25,5 +25,5 @@ class BimanualYAMFollowerConfig(RobotConfig):
     # Virtual environment path for gello_software (relative to teleoperation_system_RobotPC)
     venv_path: str = "../gello_software/.venv"
     
-    # Gello software path (relative to teleoperation_system_RobotPC)
-    gello_path: str = "../gello_software"
+    # Gello software path (relative to teleoperation_system_RobotPC) - optional for X5 systems
+    gello_path: Optional[str] = "../gello_software"

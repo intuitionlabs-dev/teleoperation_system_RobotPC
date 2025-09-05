@@ -30,19 +30,22 @@ class BimanualYAMFollowerZMQ(Robot):
         self._last_left_positions = None  # Store last valid left arm positions
         self._last_right_positions = None  # Store last valid right arm positions
         
-        # Add gello_software to path
-        if Path(config.gello_path).is_absolute():
-            gello_path = Path(config.gello_path)
+        # Add gello_software to path (optional for X5 systems)
+        if config.gello_path is not None:
+            if Path(config.gello_path).is_absolute():
+                gello_path = Path(config.gello_path)
+            else:
+                base_dir = Path(__file__).parent.parent.parent
+                gello_path = (base_dir / config.gello_path).resolve()
+            
+            if not gello_path.exists():
+                logger.error(f"Could not find gello_software at: {gello_path}")
+                raise RuntimeError(f"gello_software not found at {gello_path}")
+            
+            if str(gello_path) not in sys.path:
+                sys.path.append(str(gello_path))
         else:
-            base_dir = Path(__file__).parent.parent.parent
-            gello_path = (base_dir / config.gello_path).resolve()
-        
-        if not gello_path.exists():
-            logger.error(f"Could not find gello_software at: {gello_path}")
-            raise RuntimeError(f"gello_software not found at {gello_path}")
-        
-        if str(gello_path) not in sys.path:
-            sys.path.append(str(gello_path))
+            logger.info("Skipping gello_software setup (not required for this system)")
         
         # Will be initialized on connect
         self.left_client = None

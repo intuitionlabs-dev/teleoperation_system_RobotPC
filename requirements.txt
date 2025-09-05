@@ -18,6 +18,9 @@ python-can>=4.5.0  # Updated version for YAM
 pyserial>=3.5
 dynamixel-sdk>=3.7.0
 
+# Robot control - X5
+pybind11>=2.10.0  # Required for building ARX_X5 library
+
 # Utilities
 termcolor>=2.4.0
 dacite>=1.8.0

@@ -147,7 +147,7 @@ def main(cfg: BroadcastHostConfig):
                 hardware_port=6003,
                 id="right"
             ),
-            gello_path=cfg.yam_gello_path,
+            gello_path=None,  # X5 doesn't need gello_software
             id="bimanual",
         )
         logging.info("Configuring Bimanual X5 with ZMQ connection to hardware servers")

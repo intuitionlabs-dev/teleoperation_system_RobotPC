@@ -478,7 +478,7 @@ class CachingFileSystem(AbstractFileSystem):
         if item in ["transaction"]:
             # property
             return type(self).transaction.__get__(self)
-        if item in ["_cache", "transaction_type"]:
+        if item in {"_cache", "transaction_type", "protocol"}:
             # class attributes
             return getattr(type(self), item)
         if item == "__class__":
@@ -886,6 +886,7 @@ class SimpleCacheFileSystem(WholeFileCacheFileSystem):
         rpaths = [p for l, p in zip(lpaths, paths) if l is False]
         lpaths = [l for l, p in zip(lpaths, paths) if l is False]
         self.fs.get(rpaths, lpaths)
+        paths = [self._check_file(p) for p in paths]
         return LocalFileSystem().cat_ranges(
             paths, starts, ends, max_gap=max_gap, on_error=on_error, **kwargs
         )

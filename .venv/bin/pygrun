@@ -1,4 +1,4 @@
-#!/home/group/i2rt/teleoperation_system_RobotPC_X5-yam-piper/.venv/bin/python3.10
+#!/home/hexfellow/teleoperation_system_RobotPC/.venv/bin/python3
 __author__ = 'jszheng'
 import optparse
 import sys

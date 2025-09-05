@@ -15,13 +15,22 @@ source $HOME/.cargo/env
 git clone https://github.com/intuitionlabs-dev/teleoperation_system_RobotPC.git
 cd teleoperation_system_RobotPC
 
+# Install system dependencies
+sudo apt update
+sudo apt install -y cmake pybind11-dev liburdfdom-dev libkdl-parser-dev
+
 # Create environment and install dependencies
-uv venv .venv
+uv venv .venv --python 3.10
 source .venv/bin/activate
 uv pip install -r requirements.txt
 
 # For Piper system only - install piper_sdk
 cd piper_sdk && pip install -e . && cd ..
+
+# For X5 system - the ARX_X5 library will be built automatically by launch script
+# ARX_X5 is included as a regular folder (not a submodule) in this repo
+# If you encounter missing liborocos-kdl.so.1.5 error, create symlink:
+# sudo ln -sf /usr/lib/liborocos-kdl.so.1.4.0 /usr/lib/liborocos-kdl.so.1.5
 ```
 
 ### 3. Launch System
